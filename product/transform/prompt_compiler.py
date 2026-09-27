@@ -1,4 +1,8 @@
-"""Production prompt compiler — V4.4 doctrine without lab SPECIAL/hardcoded doodle handlers."""
+"""Production prompt compiler — V4.4 doctrine without lab SPECIAL/hardcoded doodle handlers.
+
+Doctrine: Improve the execution, preserve the idea.
+Doodle image = primary identity. Style sheets = material language only.
+"""
 from __future__ import annotations
 
 from typing import Any
@@ -19,12 +23,25 @@ from lab.v4.stroke_roles import (
 )
 from product.transform.styles import StyleConfig
 
+# Product-facing elastic fidelity (extends V4.4; never returned to mobile).
+EXECUTION_DOCTRINE = (
+    'Improve the execution, preserve the idea.\n'
+    "ALLOWED: smooth and regularize contours; improve symmetry, proportion, alignment, "
+    "spacing, and curvature; close tiny broken structural gaps; enrich dimensionality "
+    "and material polish; make it plump / toy-like within observed topology.\n"
+    "FORBIDDEN: replace the object with a generic category item; invent unsupported "
+    "components, limbs, accessories, or decorations; auto-add faces unless clearly drawn; "
+    "copy style-sheet subjects, poses, faces, or palette assignment."
+)
+
 
 def default_recognition(*, client_doodle_id: str | None = None) -> dict[str, Any]:
     """Minimal recognition when no VLM / lock is available yet.
 
-    Production quality will improve once automatic recognition lands; MVP
-    still compiles a strong V4.4-class prompt from doodle + style alone.
+    MVP does not block on full auto recognition. The doodle PNG is the primary
+    identity signal; this lock is a conservative semantic scaffold. Existing
+    stroke-role / recognition infra is used when a richer lock is supplied via
+    options.recognition (tests / future VLM) — never a hand-curated mobile recognizer.
     """
     return {
         "id": client_doodle_id or "anonymous",
@@ -40,12 +57,14 @@ def default_recognition(*, client_doodle_id: str | None = None) -> dict[str, Any
             "smooth contour wobble",
             "close tiny broken structural gaps when endpoints align",
             "round forms within observed topology",
+            "improve symmetry / proportion / curvature without changing identity",
         ],
         "forbidden_additions": [
             "invented face features unless drawn",
             "extra limbs / accessories not in the doodle",
             "second subject or scene elements",
             "copying style-sheet objects or palette",
+            "replacing the doodle with a generic category object",
         ],
         "faces_observed": False,
         "face_policy": (
@@ -97,7 +116,7 @@ def compile_prompt(
     if multi_image and n_style_refs >= 1:
         style_header = (
             f"PRIMARY = <IMAGE_0> (user doodle — visual + semantic source of truth).\n"
-            f"<IMAGE_1> is the {style_id.upper()} STYLE SHEET.\n"
+            f"<IMAGE_1> is the {style_id.upper()} STYLE SHEET (material language only).\n"
             f"{V44_STYLE_REF_ANTI_COPY}"
         )
     else:
@@ -155,13 +174,17 @@ def compile_prompt(
 
     look = style.look_line
     extra = style.prompt_fragments.get("extra") or ""
+    style_ver = getattr(style, "version", "") or ""
 
     return (
         f"{V44_NORTH_STAR}\n"
+        f"{EXECUTION_DOCTRINE}\n"
         f"POLISH THE USER'S DOODLE into a single centered isolated {style_id} toy/sticker object.\n"
+        "The doodle image is the PRIMARY identity — improve execution; do not replace the idea.\n"
         "Clean presentation on transparent or pure empty void. No scene, floor, ground, text, "
         "drop shadow, or environment.\n"
         f"{style_header}\n"
+        f"Style pack: {style_id} v{style_ver}\n"
         f"Material / look: {look}\n"
         f"{V44_STYLIZED_DIM}\n"
         f"{extra}\n"

@@ -19,10 +19,15 @@ from product.transform.service import TransformService
 def parse_transform_body(payload: dict[str, Any]) -> TransformRequest:
     """Map JSON body → TransformRequest.
 
-    Accepted image fields (first wins):
+    Live clients should send **both** raster + strokes:
+      - doodle_base64 / doodle_png_base64  (primary identity PNG)
+      - strokes                            (canonical stroke JSON)
+      - style
+
+    Accepted image fields (first wins for raster bytes):
       - doodle_base64 / doodle_png_base64
       - doodle_path (server-local; useful for smoke / ops)
-      - strokes (stroke JSON object)
+      - strokes alone (server raster fallback via lab.v3.raster)
     """
     opts_raw = payload.get("options") or {}
     options = TransformOptions(

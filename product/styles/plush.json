@@ -1,11 +1,13 @@
 {
   "id": "plush",
+  "version": "1.0.0",
   "display_name": "Plush",
-  "description": "Stuffed short-pile soft-toy sticker.",
-  "sheet": "docs/refs/style_sheets/sheet_plush.png",
+  "description": "Stuffed short-pile soft-toy sticker — cozy fabric nap, soft compression.",
+  "sheet": "product/assets/style_sheets/sheet_plush.png",
   "sheet_fallbacks": [
-    "product/assets/style_sheets/sheet_plush.png"
+    "docs/refs/style_sheets/sheet_plush.png"
   ],
+  "visual_language": "stuffed short-pile soft-toy sticker; cozy fabric presence",
   "form_language": "stuffed compression; cozy soft-toy silhouette with fuzzy fringe",
   "material_language": "short-pile stuffed fabric; visible nap/fuzz; subtle seams only if natural",
   "lighting_language": "soft fabric roll-off; no hard speculars",

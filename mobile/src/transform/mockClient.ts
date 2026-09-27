@@ -52,6 +52,8 @@ export class MockTransformClient implements TransformClient {
           mock: true,
           sample: true,
           client_doodle_id: request.client_doodle_id ?? null,
+          has_doodle_raster: Boolean(request.doodle_base64),
+          has_strokes: Boolean(request.strokes?.strokes?.length),
         },
       };
     } catch (err) {

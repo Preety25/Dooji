@@ -25,6 +25,9 @@ class TransformOptions:
 class TransformRequest:
     """Inbound transform contract for POST /v1/transform.
 
+    Live path expects both a raster doodle PNG (primary identity) and canonical
+    stroke JSON. Strokes alone remain accepted for server-side raster fallback.
+
     No provider names, prompts, style sheets, or API keys.
     """
 
@@ -46,6 +49,14 @@ class TransformRequest:
             })
         if not self.doodle_png and not self.doodle_path and not self.strokes:
             raise ValueError("provide doodle_png, doodle_path, or strokes")
+
+    @property
+    def has_raster(self) -> bool:
+        return bool(self.doodle_png) or bool(self.doodle_path)
+
+    @property
+    def has_strokes(self) -> bool:
+        return bool(self.strokes)
 
 
 @dataclass

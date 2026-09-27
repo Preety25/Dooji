@@ -1,16 +1,27 @@
-# Style sheets for production
+# Canonical style sheets (product)
 
-Canonical paths expected by style configs:
+**Single product-level style system.** Sheets live here and are mirrored under
+`docs/refs/style_sheets/` for lab path compatibility. Do not scatter duplicates
+elsewhere.
 
-- `docs/refs/style_sheets/sheet_gummy.png`
-- `docs/refs/style_sheets/sheet_clay.png`
-- `docs/refs/style_sheets/sheet_plush.png`
-- `docs/refs/style_sheets/sheet_glossy.png`
+| Style | File | Version (see `product/styles/*.json`) |
+|---|---|---|
+| Gummy | `sheet_gummy.png` | `product/styles/gummy.json` → `version` |
+| Clay | `sheet_clay.png` | `product/styles/clay.json` |
+| Plush | `sheet_plush.png` | `product/styles/plush.json` |
+| Glossy | `sheet_glossy.png` | `product/styles/glossy.json` |
 
-Those files were referenced by V4.3/V4.4 lab runners but were not present on
-`stylization/v4-ai-rendering` at foundation time. Place versioned material-only
-boards there (or under this directory) before live multi-style quality gates.
+## Doctrine
 
-Until then, style JSON `sheet_fallbacks` may resolve to older tracked refs
-(e.g. `docs/refs/ref2_gummy_star_gradient.png`, `docs/refs/ref1_glossy_blob.png`).
-Clay/plush have no good tracked fallback — text style language still applies.
+Style sheets = **visual / material language ONLY**:
+
+- Teach form language, material, lighting, surface, dimensionality, finish personality.
+- Do **not** encode object identity — never copy sheet subjects, poses, faces, or palettes onto the user's doodle.
+- Gummy sheet specifically: stylized 3D toy/candy gelatin (volume, bubbles, wet highlights) — not photoreal food, hard plastic, glass, or flat extrusion.
+
+Config fields (versioned JSON): `id`, `version`, `description`, `visual_language`,
+`form_language`, `material_language`, `lighting_language`, `forbidden`, `sheet`,
+`prompt_fragments`.
+
+Resolution order: `StyleConfig.resolve_sheet()` → canonical `sheet` path, then
+`sheet_fallbacks`.

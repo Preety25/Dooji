@@ -22,14 +22,26 @@ npm run web
 | `EXPO_PUBLIC_TRANSFORM_MODE=http` | `HttpTransformClient` → `POST {EXPO_PUBLIC_TRANSFORM_API_URL}/v1/transform` |
 | `EXPO_PUBLIC_TRANSFORM_API_URL` | Default `http://127.0.0.1:8080` |
 
-To hit the Python stub (still mock provider server-side):
+### Live xAI (server only)
 
 ```bash
-# repo root
-IMAGE_PROVIDER=mock python3 -m product.api.app
-# then in mobile/
-EXPO_PUBLIC_TRANSFORM_MODE=http EXPO_PUBLIC_TRANSFORM_API_URL=http://127.0.0.1:8080 npm start
+# repo root — ONE gummy generation (1k / low / n=1)
+export XAI_API_KEY=...          # never put this in mobile env
+export IMAGE_PROVIDER=xai
+export DOOJI_LIVE=1
+export DOOJI_OUT=out/product/live_slice
+python3 -m scripts.run_live_gummy_once
+
+# then point the app at the live API
+IMAGE_PROVIDER=xai python3 -m product.api.app
+# mobile/
+EXPO_PUBLIC_TRANSFORM_MODE=http \
+EXPO_PUBLIC_TRANSFORM_API_URL=http://127.0.0.1:8080 \
+npm start
 ```
+
+Mobile never receives `XAI_API_KEY`, xAI URLs, or prompts. TransformRequest carries
+`doodle_base64` (canvas PNG) + `strokes` + `style`.
 
 ## Architecture
 

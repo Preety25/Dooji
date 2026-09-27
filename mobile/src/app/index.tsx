@@ -56,6 +56,7 @@ export default function CanvasScreen() {
           size={app.brushSize}
           tool={app.tool}
           onStrokeEnd={app.addStroke}
+          onLayoutSize={app.setCanvasLayout}
         />
         {!app.hasStrokes && (
           <View pointerEvents="none" style={styles.hint}>

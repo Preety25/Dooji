@@ -1,12 +1,14 @@
 {
   "id": "glossy",
+  "version": "1.0.0",
   "display_name": "Glossy",
-  "description": "Solid opaque polished resin / lacquered vinyl toy sticker.",
-  "sheet": "docs/refs/style_sheets/sheet_glossy.png",
+  "description": "Solid opaque polished resin / lacquered vinyl toy sticker — clearcoat, never translucent jelly.",
+  "sheet": "product/assets/style_sheets/sheet_glossy.png",
   "sheet_fallbacks": [
-    "product/assets/style_sheets/sheet_glossy.png",
+    "docs/refs/style_sheets/sheet_glossy.png",
     "docs/refs/ref1_glossy_blob.png"
   ],
+  "visual_language": "solid opaque polished resin / lacquered vinyl hard-toy sticker",
   "form_language": "hard-toy plump resin volumes; filled solid — never wireframe strokes",
   "material_language": "solid opaque polished resin / lacquered vinyl / hard-candy finish (NOT translucent jelly)",
   "lighting_language": "crisp clearcoat specular highlights; hard polished rim",

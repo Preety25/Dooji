@@ -1,12 +1,14 @@
 {
   "id": "clay",
+  "version": "1.0.0",
   "display_name": "Clay",
-  "description": "Soft-sculpted matte polymer clay / play-doh sticker.",
-  "sheet": "docs/refs/style_sheets/sheet_clay.png",
+  "description": "Soft-sculpted matte polymer clay / play-doh sticker — handmade puffy volume, not ceramic photo.",
+  "sheet": "product/assets/style_sheets/sheet_clay.png",
   "sheet_fallbacks": [
-    "product/assets/style_sheets/sheet_clay.png"
+    "docs/refs/style_sheets/sheet_clay.png"
   ],
-  "form_language": "puffy handmade sculpted forms; soft lip edges",
+  "visual_language": "soft-sculpted matte polymer clay toy sticker; handmade puffy forms",
+  "form_language": "puffy handmade sculpted forms; soft lip edges; plump toy volume",
   "material_language": "matte polymer clay / play-doh; subtle surface variation; opaque soft body",
   "lighting_language": "restrained warm diffuse highlights; no clearcoat",
   "forbidden": [

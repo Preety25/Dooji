@@ -28,9 +28,9 @@ class TransformService:
     def transform(self, request: TransformRequest) -> TransformResult:
         style_cfg = load_style(request.style, root=self.root)
 
-        # 1) Resolve doodle PNG bytes
+        # 1) Resolve doodle PNG bytes (client raster preferred; strokes = fallback)
         try:
-            doodle_png = self._resolve_doodle(request)
+            doodle_png, doodle_source = self._resolve_doodle(request)
         except Exception as exc:
             return TransformResult(
                 status="error",
@@ -113,6 +113,8 @@ class TransformService:
                 image_base64=b64,
                 metadata={
                     "prompt_len": len(prompt),
+                    "style_id": style_cfg.id,
+                    "style_version": style_cfg.version,
                     "style_sheet": str(sheet) if sheet else None,
                     "style_sheet_missing": sheet is None,
                     "recognition_id": recognition.get("id"),
@@ -124,21 +126,28 @@ class TransformService:
                     },
                     "client_doodle_id": request.client_doodle_id,
                     "doodle_bytes_in": len(doodle_png),
+                    "doodle_source": doodle_source,
+                    "has_client_raster": request.has_raster,
+                    "has_strokes": request.has_strokes,
                     "final_bytes": len(pp.image_bytes),
                 },
             )
 
-    def _resolve_doodle(self, request: TransformRequest) -> bytes:
+    def _resolve_doodle(self, request: TransformRequest) -> tuple[bytes, str]:
+        """Prefer client raster PNG (primary identity); fall back to stroke raster."""
         if request.doodle_png:
-            return request.doodle_png
+            return request.doodle_png, "client_png"
         if request.doodle_path:
-            return Path(request.doodle_path).read_bytes()
+            return Path(request.doodle_path).read_bytes(), "doodle_path"
         if request.strokes:
             from product.transform.raster import strokes_to_png_bytes
 
-            return strokes_to_png_bytes(
-                request.strokes,
-                size=int(request.options.size or 1024),
+            return (
+                strokes_to_png_bytes(
+                    request.strokes,
+                    size=int(request.options.size or 1024),
+                ),
+                "strokes_raster",
             )
         raise ValueError("no doodle input")
 

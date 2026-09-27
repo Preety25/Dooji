@@ -21,6 +21,8 @@ export interface StrokeJsonStroke {
   points: [number, number][];
   closed?: boolean;
   color?: string | null;
+  /** Brush width in canvas units (product extension; PNG remains primary). */
+  width?: number;
 }
 
 export interface StrokeJson {
@@ -31,8 +33,12 @@ export interface StrokeJson {
 
 export interface TransformRequest {
   style: StyleId;
-  /** PNG as base64 (no data: prefix required). */
+  /**
+   * Normalized doodle PNG as base64 (no data: prefix).
+   * Required for live transform — primary identity signal alongside strokes.
+   */
   doodle_base64?: string;
+  /** Canonical stroke JSON (source of truth for edit/retry; complements PNG). */
   strokes?: StrokeJson;
   client_doodle_id?: string;
   options?: TransformOptions;

@@ -38,6 +38,9 @@ out/contact_sheets/
 # Keep curated art-direction refs that are source material (not pipeline output)
 !docs/refs/**/*.png
 
+# Product-canonical style sheets (material-only boards; versioned with styles JSON)
+!product/assets/**/*.png
+
 # Mobile Expo mock / branded PNGs (bundled for MOCK mode)
 !mobile/assets/**/*.png
 

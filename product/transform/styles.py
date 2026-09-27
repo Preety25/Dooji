@@ -1,4 +1,10 @@
-"""Style pack loader — styles as versioned data, not scattered code."""
+"""Style pack loader — styles as versioned data, not scattered code.
+
+Single product-level style system:
+  product/styles/{id}.json          → versioned config
+  product/assets/style_sheets/      → canonical material-only sheets
+  docs/refs/style_sheets/           → mirror for lab path compatibility
+"""
 from __future__ import annotations
 
 import json
@@ -16,10 +22,12 @@ DOCS_REFS = ROOT / "docs" / "refs"
 @dataclass(frozen=True)
 class StyleConfig:
     id: str
+    version: str
     display_name: str
     description: str
     sheet: str
     sheet_fallbacks: tuple[str, ...]
+    visual_language: str
     form_language: str
     material_language: str
     lighting_language: str
@@ -34,6 +42,8 @@ class StyleConfig:
             self.prompt_fragments.get("look")
             or f"{self.id.upper()} material: {self.material_language}",
         ]
+        if self.visual_language:
+            parts.append(f"Visual language: {self.visual_language}")
         if self.form_language:
             parts.append(f"Form: {self.form_language}")
         if self.lighting_language:
@@ -73,10 +83,12 @@ def load_style(style_id: str, *, root: Path | None = None) -> StyleConfig:
     raw = _load_json(path)
     cfg = StyleConfig(
         id=raw["id"],
+        version=str(raw.get("version") or "0.0.0"),
         display_name=raw.get("display_name") or raw["id"],
         description=raw.get("description") or "",
         sheet=raw.get("sheet") or "",
         sheet_fallbacks=tuple(raw.get("sheet_fallbacks") or ()),
+        visual_language=raw.get("visual_language") or "",
         form_language=raw.get("form_language") or "",
         material_language=raw.get("material_language") or "",
         lighting_language=raw.get("lighting_language") or "",
@@ -92,3 +104,7 @@ def load_style(style_id: str, *, root: Path | None = None) -> StyleConfig:
 def list_styles(*, root: Path | None = None) -> list[str]:
     base = (root or ROOT) / "product" / "styles"
     return sorted(p.stem for p in base.glob("*.json"))
+
+
+def clear_style_cache() -> None:
+    _CACHE.clear()

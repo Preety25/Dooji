@@ -24,8 +24,13 @@ export function toStrokeJson(
         points: s.points.map((p) => [p.x, p.y] as [number, number]),
         closed: Boolean(s.closed),
         color: s.color,
+        // width is product-extension (schema allows additional props); PNG is primary.
+        width: s.width,
       })),
-    meta: { exported_at: new Date().toISOString() },
+    meta: {
+      exported_at: new Date().toISOString(),
+      source: 'dooji-mobile',
+    },
   };
 }
 

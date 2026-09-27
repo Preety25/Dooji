@@ -5,10 +5,15 @@ import React, {
   useEffect,
   useMemo,
   useReducer,
+  useRef,
   type ReactNode,
 } from 'react';
 
 import { track } from '../analytics/events';
+import {
+  DoodleRasterCapture,
+  type DoodleRasterHandle,
+} from '../components/DoodleRasterCapture';
 import { newId, nowIso } from '../lib/id';
 import { cloneStrokes, toStrokeJson } from '../lib/strokes';
 import {
@@ -41,6 +46,8 @@ interface AppState {
   generatingCopy: string;
   lastError?: string;
   dirty: boolean;
+  /** Live canvas layout size (stroke coordinate space). */
+  canvasLayout: { width: number; height: number };
 }
 
 type Action =
@@ -67,7 +74,8 @@ type Action =
   | { type: 'load_creation'; creation: Creation }
   | { type: 'new_doodle' }
   | { type: 'set_dirty'; dirty: boolean }
-  | { type: 'replace_creation'; creation: Creation };
+  | { type: 'replace_creation'; creation: Creation }
+  | { type: 'set_canvas_layout'; width: number; height: number };
 
 const BRUSH_COLORS = ['#1A1423', '#FF5C7A', '#5B8CFF', '#2EC4B6', '#F4A261', '#FFFFFF'];
 
@@ -99,6 +107,7 @@ function initialState(): AppState {
     redoStack: [],
     generatingCopy: 'Understanding your doodle…',
     dirty: false,
+    canvasLayout: { width: 1080, height: 1080 },
   };
 }
 
@@ -232,6 +241,15 @@ function reducer(state: AppState, action: Action): AppState {
       return { ...state, dirty: action.dirty };
     case 'replace_creation':
       return { ...state, creation: action.creation };
+    case 'set_canvas_layout':
+      return {
+        ...state,
+        canvasLayout: { width: action.width, height: action.height },
+        creation: {
+          ...state.creation,
+          canvas: { width: action.width, height: action.height },
+        },
+      };
     default:
       return state;
   }
@@ -253,6 +271,7 @@ interface AppContextValue extends AppState {
   setColor: (color: string) => void;
   setSize: (size: number) => void;
   addStroke: (stroke: DoodleStroke) => void;
+  setCanvasLayout: (size: { width: number; height: number }) => void;
   undo: () => void;
   redo: () => void;
   clearCanvas: () => void;
@@ -271,6 +290,12 @@ const AppContext = createContext<AppContextValue | null>(null);
 
 export function AppProvider({ children }: { children: ReactNode }) {
   const [state, dispatch] = useReducer(reducer, undefined, initialState);
+  const rasterRef = useRef<DoodleRasterHandle>(null);
+  // Keep a ref to the latest creation so async transform always preserves strokes.
+  const creationRef = useRef(state.creation);
+  const layoutRef = useRef(state.canvasLayout);
+  creationRef.current = state.creation;
+  layoutRef.current = state.canvasLayout;
 
   useEffect(() => {
     track('app_open');
@@ -285,6 +310,8 @@ export function AppProvider({ children }: { children: ReactNode }) {
 
   const runTransform = useCallback(
     async (opts: { style: StyleId; reason: 'make' | 'style' | 'try' | 'retry' }) => {
+      const creation = creationRef.current;
+      const layout = layoutRef.current;
       const entitlement = usage.can('transform');
       if (!entitlement.allowed) {
         dispatch({
@@ -292,21 +319,21 @@ export function AppProvider({ children }: { children: ReactNode }) {
           error: 'That one got a little weird.',
           job: {
             id: newId('job'),
-            creationId: state.creation.id,
+            creationId: creation.id,
             style: opts.style,
             status: 'failed',
             startedAt: nowIso(),
             finishedAt: nowIso(),
             error: 'entitlement',
           },
-          creation: state.creation,
+          creation,
         });
         return;
       }
 
       const job: GenerationJob = {
         id: newId('job'),
-        creationId: state.creation.id,
+        creationId: creation.id,
         style: opts.style,
         status: 'running',
         startedAt: nowIso(),
@@ -321,12 +348,53 @@ export function AppProvider({ children }: { children: ReactNode }) {
       if (opts.reason === 'try') track('try_another', { style: opts.style });
       track('transform_started', { style: opts.style, reason: opts.reason });
 
+      const strokesSnapshot = cloneStrokes(creation.strokes);
+      const canvas = {
+        width: layout.width || creation.canvas.width,
+        height: layout.height || creation.canvas.height,
+      };
+
+      // Rasterize current doodle → PNG (primary identity). Strokes stay canonical.
+      let doodleBase64: string | undefined;
+      try {
+        if (!rasterRef.current) {
+          throw new Error('raster_surface_missing');
+        }
+        doodleBase64 = await rasterRef.current.capturePngBase64();
+        if (!doodleBase64) {
+          throw new Error('raster_capture_empty');
+        }
+      } catch (err) {
+        track('transform_failed', {
+          style: opts.style,
+          error: err instanceof Error ? err.message : 'raster_failed',
+        });
+        const doneJob: GenerationJob = {
+          ...job,
+          status: 'failed',
+          finishedAt: nowIso(),
+          error: 'raster_failed',
+        };
+        dispatch({
+          type: 'transform_err',
+          error: 'That one got a little weird.',
+          job: doneJob,
+          creation: {
+            ...creation,
+            strokes: strokesSnapshot,
+            jobs: [...creation.jobs.filter((j) => j.id !== job.id), doneJob],
+            updatedAt: nowIso(),
+          },
+        });
+        return;
+      }
+
       const client = getTransformClient();
-      const strokesSnapshot = cloneStrokes(state.creation.strokes);
       const result: TransformResult = await client.transform({
         style: opts.style,
-        strokes: toStrokeJson(strokesSnapshot, state.creation.canvas),
-        client_doodle_id: state.creation.id,
+        doodle_base64: doodleBase64,
+        strokes: toStrokeJson(strokesSnapshot, canvas),
+        client_doodle_id: creation.id,
         options: { size: 1024 },
       });
 
@@ -338,7 +406,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
           : `data:image/png;base64,${result.image_base64}`;
         const asset: GeneratedAsset = {
           id: newId('asset'),
-          creationId: state.creation.id,
+          creationId: creation.id,
           style: opts.style,
           imageUri,
           transformVersion: result.transform_version,
@@ -352,16 +420,20 @@ export function AppProvider({ children }: { children: ReactNode }) {
           finishedAt: nowIso(),
           assetId: asset.id,
         };
-        const creation: Creation = {
-          ...state.creation,
+        const next: Creation = {
+          ...creation,
           style: opts.style,
           strokes: strokesSnapshot,
-          assets: [...state.creation.assets, asset],
-          jobs: [...state.creation.jobs.filter((j) => j.id !== job.id), doneJob],
+          canvas,
+          doodlePreviewUri: doodleBase64
+            ? `data:image/png;base64,${doodleBase64}`
+            : creation.doodlePreviewUri,
+          assets: [...creation.assets, asset],
+          jobs: [...creation.jobs.filter((j) => j.id !== job.id), doneJob],
           updatedAt: nowIso(),
         };
         track('transform_succeeded', { style: opts.style });
-        dispatch({ type: 'transform_ok', asset, job: doneJob, creation });
+        dispatch({ type: 'transform_ok', asset, job: doneJob, creation: next });
       } else {
         const doneJob: GenerationJob = {
           ...job,
@@ -369,10 +441,15 @@ export function AppProvider({ children }: { children: ReactNode }) {
           finishedAt: nowIso(),
           error: result.error || 'unknown',
         };
-        const creation: Creation = {
-          ...state.creation,
+        // Preserve strokes + Creation on error — retry / edit remain available.
+        const next: Creation = {
+          ...creation,
           strokes: strokesSnapshot,
-          jobs: [...state.creation.jobs.filter((j) => j.id !== job.id), doneJob],
+          canvas,
+          doodlePreviewUri: doodleBase64
+            ? `data:image/png;base64,${doodleBase64}`
+            : creation.doodlePreviewUri,
+          jobs: [...creation.jobs.filter((j) => j.id !== job.id), doneJob],
           updatedAt: nowIso(),
         };
         track('transform_failed', { style: opts.style, error: result.error });
@@ -380,11 +457,11 @@ export function AppProvider({ children }: { children: ReactNode }) {
           type: 'transform_err',
           error: 'That one got a little weird.',
           job: doneJob,
-          creation,
+          creation: next,
         });
       }
     },
-    [state.creation],
+    [],
   );
 
   const value = useMemo<AppContextValue>(() => {
@@ -403,6 +480,8 @@ export function AppProvider({ children }: { children: ReactNode }) {
       setColor: (color) => dispatch({ type: 'set_color', color }),
       setSize: (size) => dispatch({ type: 'set_size', size }),
       addStroke: (stroke) => dispatch({ type: 'add_stroke', stroke }),
+      setCanvasLayout: ({ width, height }) =>
+        dispatch({ type: 'set_canvas_layout', width, height }),
       undo: () => dispatch({ type: 'undo' }),
       redo: () => dispatch({ type: 'redo' }),
       clearCanvas: () => dispatch({ type: 'clear' }),
@@ -450,7 +529,17 @@ export function AppProvider({ children }: { children: ReactNode }) {
     };
   }, [state, runTransform]);
 
-  return <AppContext.Provider value={value}>{children}</AppContext.Provider>;
+  return (
+    <AppContext.Provider value={value}>
+      {children}
+      <DoodleRasterCapture
+        ref={rasterRef}
+        strokes={state.creation.strokes}
+        canvasWidth={state.canvasLayout.width}
+        canvasHeight={state.canvasLayout.height}
+      />
+    </AppContext.Provider>
+  );
 }
 
 export function useApp(): AppContextValue {

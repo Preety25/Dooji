@@ -15,6 +15,7 @@ interface Props {
   size: number;
   tool: 'brush' | 'eraser';
   onStrokeEnd: (stroke: DoodleStroke) => void;
+  onLayoutSize?: (size: { width: number; height: number }) => void;
   enabled?: boolean;
 }
 
@@ -24,6 +25,7 @@ export function DoodleCanvas({
   size,
   tool,
   onStrokeEnd,
+  onLayoutSize,
   enabled = true,
 }: Props) {
   const [sizeBox, setSizeBox] = useState({ width: 1, height: 1 });
@@ -33,6 +35,7 @@ export function DoodleCanvas({
   const onLayout = (e: LayoutChangeEvent) => {
     const { width, height } = e.nativeEvent.layout;
     setSizeBox({ width, height });
+    onLayoutSize?.({ width, height });
   };
 
   const begin = useCallback(

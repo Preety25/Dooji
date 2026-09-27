@@ -1,24 +1,28 @@
 {
   "id": "gummy",
+  "version": "1.0.0",
   "display_name": "Gummy",
-  "description": "Juicy soft inflated translucent gelatin candy sticker.",
-  "sheet": "docs/refs/style_sheets/sheet_gummy.png",
+  "description": "Stylized 3D toy/candy gelatin — soft volume, internal bubbles, wet highlights. Not photoreal food, hard plastic, glass, or flat extrusion.",
+  "sheet": "product/assets/style_sheets/sheet_gummy.png",
   "sheet_fallbacks": [
-    "product/assets/style_sheets/sheet_gummy.png",
+    "docs/refs/style_sheets/sheet_gummy.png",
     "docs/refs/ref2_gummy_star_gradient.png",
     "docs/refs/jelly_gummy/ref_jelly_gummy_flower.png"
   ],
-  "form_language": "soft inflated candy volume; rounded luminous silhouette",
-  "material_language": "translucent gelatin with internal color depth and suspended micro-bubbles",
-  "lighting_language": "wet rounded candy highlights; soft luminous rim",
+  "visual_language": "premium stylized 3D candy-toy gelatin sticker; plump translucent volume",
+  "form_language": "soft inflated candy volume; rounded luminous silhouette; dimensional toy plumpness — never flat extrusion",
+  "material_language": "translucent gelatin candy with internal color depth and suspended micro-bubbles; juicy soft body",
+  "lighting_language": "wet rounded candy highlights; soft luminous rim; internal glow — not hard plastic speculars",
   "forbidden": [
-    "glass/acrylic look",
     "photoreal food photography",
-    "hard opaque resin",
+    "glass/acrylic look",
+    "hard opaque plastic or resin",
+    "flat 2.5D bevel extrusion",
     "matte clay",
-    "fuzzy plush"
+    "fuzzy plush",
+    "copying style-sheet subjects or palettes"
   ],
   "prompt_fragments": {
-    "look": "GUMMY material ONLY: juicy soft inflated translucent gelatin candy; internal color depth; suspended micro-bubbles; wet rounded highlights; luminous soft edges. NOT glass, NOT hard opaque resin, NOT clay, NOT plush."
+    "look": "GUMMY material ONLY: stylized 3D toy/candy gelatin — juicy soft inflated translucent gelatin with volume, suspended micro-bubbles, wet rounded highlights, luminous soft edges, internal color depth. NOT photoreal food photo, NOT hard plastic, NOT glass/acrylic, NOT flat extrusion, NOT clay, NOT plush."
   }
 }
