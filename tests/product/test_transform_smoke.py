@@ -102,10 +102,10 @@ def test_transform_mock_with_raster_and_strokes() -> None:
             doodle_png=doodle,
             strokes=strokes,
             client_doodle_id="smoke_raster",
-            options=TransformOptions(size=64, dry_run=True),
+            options=TransformOptions(size=64, dry_run=False),
         )
     )
-    assert result.status in ("ok", "dry_run")
+    assert result.status == "ok"
     assert result.provider == "mock"
     assert result.image_base64
     assert result.metadata.get("has_client_raster") is True
@@ -117,6 +117,36 @@ def test_transform_mock_with_raster_and_strokes() -> None:
     blob = str(result.to_dict())
     assert "POLISH THE USER" not in blob
     assert "Improve the execution" not in blob
+
+
+def test_transform_mock_explicit_dry_run_status() -> None:
+    """status=dry_run only when options.dry_run is true — not merely IMAGE_PROVIDER=mock."""
+    doodle = _tiny_png()
+    svc = TransformService(provider=MockImageProvider())
+
+    ok_result = svc.transform(
+        TransformRequest(
+            style="gummy",
+            doodle_png=doodle,
+            client_doodle_id="mock_ok",
+            options=TransformOptions(size=64, dry_run=False),
+        )
+    )
+    assert ok_result.status == "ok"
+    assert ok_result.provider == "mock"
+    assert ok_result.image_base64
+
+    dry_result = svc.transform(
+        TransformRequest(
+            style="gummy",
+            doodle_png=doodle,
+            client_doodle_id="mock_dry",
+            options=TransformOptions(size=64, dry_run=True),
+        )
+    )
+    assert dry_result.status == "dry_run"
+    assert dry_result.provider == "mock"
+    assert dry_result.image_base64
 
 
 def test_api_handler_accepts_both() -> None:
@@ -131,14 +161,25 @@ def test_api_handler_accepts_both() -> None:
                 ],
             },
             "client_doodle_id": "api_both",
-            "options": {"dry_run": True, "size": 64},
+            "options": {"dry_run": False, "size": 64},
         }
     )
-    assert body["status"] in ("ok", "dry_run")
+    assert body["status"] == "ok"
     assert body["style"] == "gummy"
     assert body.get("image_base64")
     assert "XAI_API_KEY" not in str(body)
     assert body.get("metadata", {}).get("has_client_raster") is True
+
+    dry_body = handle_transform(
+        {
+            "style": "gummy",
+            "doodle_base64": base64.b64encode(_tiny_png()).decode("ascii"),
+            "client_doodle_id": "api_dry",
+            "options": {"dry_run": True, "size": 64},
+        }
+    )
+    assert dry_body["status"] == "dry_run"
+    assert dry_body.get("image_base64")
 
 
 def test_xai_provider_skips_without_key() -> None:
@@ -221,6 +262,8 @@ def main() -> int:
     print("ok prompt doctrine")
     test_transform_mock_with_raster_and_strokes()
     print("ok transform mock raster+strokes")
+    test_transform_mock_explicit_dry_run_status()
+    print("ok mock status ok vs dry_run")
     test_api_handler_accepts_both()
     print("ok api both fields")
     test_xai_provider_skips_without_key()

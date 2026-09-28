@@ -57,7 +57,9 @@ class TransformService:
             n_style_refs=len(style_refs),
         )
 
-        dry = bool(request.options.dry_run) or getattr(self.provider, "name", "") == "mock"
+        # dry_run status only when the client explicitly requests it — not merely
+        # because IMAGE_PROVIDER=mock (mock still returns a real image_base64).
+        dry = bool(request.options.dry_run)
 
         with tempfile.TemporaryDirectory(prefix="dooji_transform_") as tmp:
             work = Path(tmp)
