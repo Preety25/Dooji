@@ -117,7 +117,12 @@ class TransformHandler(BaseHTTPRequestHandler):
             self._send(500, {"status": "error", "error": f"{type(exc).__name__}"})
 
 
-def serve(host: str = "127.0.0.1", port: int = 8080) -> None:
+def serve(host: str = "0.0.0.0", port: int = 8080) -> None:
+    """Serve the transform stub.
+
+    Default bind is 0.0.0.0 so a physical phone on the same LAN can reach
+    POST /v1/transform. Override with DOOJI_HOST=127.0.0.1 for localhost-only.
+    """
     httpd = ThreadingHTTPServer((host, port), TransformHandler)
     print(f"Dooji transform listening on http://{host}:{port}  (POST /v1/transform)")
     httpd.serve_forever()
@@ -127,6 +132,6 @@ if __name__ == "__main__":
     import os
 
     serve(
-        host=os.environ.get("DOOJI_HOST", "127.0.0.1"),
+        host=os.environ.get("DOOJI_HOST", "0.0.0.0"),
         port=int(os.environ.get("DOOJI_PORT", "8080")),
     )

@@ -32,13 +32,38 @@ export DOOJI_LIVE=1
 export DOOJI_OUT=out/product/live_slice
 python3 -m scripts.run_live_gummy_once
 
-# then point the app at the live API
+# then point the app at the live API (simulator / same machine)
 IMAGE_PROVIDER=xai python3 -m product.api.app
 # mobile/
 EXPO_PUBLIC_TRANSFORM_MODE=http \
 EXPO_PUBLIC_TRANSFORM_API_URL=http://127.0.0.1:8080 \
 npm start
 ```
+
+### Physical phone (same Wi-Fi) — device E2E
+
+Run the API **on the computer that shares Wi-Fi with the phone** (not a Cloud Agent VM).
+
+```bash
+# Terminal 1 — repo root (server only; key stays here)
+pip install -r requirements-product.txt
+export XAI_API_KEY=...          # never put this in mobile env
+export IMAGE_PROVIDER=xai
+export DOOJI_HOST=0.0.0.0
+export DOOJI_PORT=8080
+python3 -m product.api.app
+
+# Terminal 2 — discover LAN IP, then start Expo
+#   macOS:  ipconfig getifaddr en0
+#   Linux:  hostname -I | awk '{print $1}'
+cd mobile
+cp .env.example .env            # then set EXPO_PUBLIC_TRANSFORM_API_URL=http://YOUR_LAN_IP:8080
+npm install
+npx expo start --lan
+```
+
+Phone: open Expo Go → scan the QR → draw → **Make it ✨**.  
+Sanity check from the phone browser first: `http://YOUR_LAN_IP:8080/health` → `{"status":"ok",...}`.
 
 Mobile never receives `XAI_API_KEY`, xAI URLs, or prompts. TransformRequest carries
 `doodle_base64` (canvas PNG) + `strokes` + `style`.
