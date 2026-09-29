@@ -113,14 +113,23 @@ More specifically:
 
 Enter Preview from Canvas via **Make it ✨**. Preview does **not** call the Transform API by itself.
 
+Preview is a **material / style selection** moment — **not** a visual preview of the user’s transformed doodle. The user’s doodle remains on Canvas and is **intentionally withheld** from Preview. The transformed Dooji is first revealed on **Result**.
+
 | Rule | Behavior |
 |---|---|
 | `selectedStyle` on entry | **`undefined`** — nothing selected |
-| Default style in UI | **No default Gummy** (or any other default) |
-| Doodle | Show the user’s doodle |
-| Style tiles | Four **static** style previews: Gummy, Clay, Plush, Glossy (product chrome; not live per-style renders required on Preview) |
+| Default style in UI | **None** — no default Gummy (or any other default) |
+| User doodle | **NOT shown** |
+| Style tiles | Four **static** material previews: Gummy, Clay, Plush, Glossy (product chrome; not live / user-specific renders) |
 | Surprise me ✨ | Shown on Preview |
 | Generation CTA on Preview | **None** — no “Make it [Style] ✨” on Preview |
+
+Canonical tile order:
+
+```text
+Gummy     Clay
+Plush     Glossy
+```
 
 **When the user taps a Preview style tile:**
 
@@ -159,9 +168,11 @@ Intended product phases:
 
 - Phase value: `preview`.
 - `selectedStyle` starts **`undefined`**.
-- Shows doodle + four static style previews + Surprise me ✨.
+- Shows heading + four static material tiles + Surprise me ✨.
+- Does **not** show the user’s doodle, a transformed doodle, or any AI output.
 - No generation CTA on this screen.
 - Style tile or Surprise me → immediate cache/generation flow (see §4).
+- No persistent selected-style presentation is required on Preview (brief press feedback only).
 
 ### Generating
 

@@ -154,7 +154,7 @@ Non-route UI lives under `mobile/src/components/` (e.g. `DoodleCanvas`, `StyleSe
 | `activeAssetId` | No (hint stored in Creation.metadata on Save) | Displayed hero asset |
 | In-flight job / guard | No | Cleared on complete / invalidate |
 
-**Intended vs current:** Product Contract Preview rules (no default selection, immediate tile generation, Surprise me) match current Preview wiring. UI chrome is still logic-host / interim visuals pending Design Handoff.
+**Intended vs current:** Product Contract Preview rules (no default selection, immediate tile generation, Surprise me, **no user doodle on Preview**) match the interaction wiring. UI chrome is still logic-host / interim visuals pending Design Handoff.
 
 ---
 
@@ -488,9 +488,9 @@ Only gaps observed between Product Contract intent and current code/docs:
 | Credits / entitlement | `AlwaysAllowUsage` always allows; counts transforms in memory | Cache-before-credit; real entitlement when productized | Replace placeholder when pricing exists |
 | Post-processing | Stub passthrough / light normalize | Full bg removal / edge / crop seam | Implement behind existing seam |
 | Recognition | Minimal `default_recognition` scaffold; doodle PNG is primary identity | Authorship-preserving transform without fake client “weirdness” | Richer recognition optional later; not a client detector |
-| Visual design | Logic-host screens (Preview/Result/etc.) | Premium playful UI | Future `DESIGN-HANDOFF.md` — not this task |
+| Visual design | Logic-host screens (Preview/Result/etc.) | Premium playful UI per `docs/design/DESIGN-HANDOFF.md` | Visual implementation pass |
 | Result generated indicator | `StyleSelector` highlights `selected` only; `selectedStyleIsGenerated` drives CTA visibility | Generated styles show checkmark; ungenerated styles do not | Add per-style “generated for current source” affordance in UI |
-| Preview static style previews | Style chips (label/blurb) in `StyleSelector` | Static Gummy/Clay/Plush/Glossy preview tiles + doodle | Visual polish in Design Handoff; logic path is tile tap → cache/generate |
+| Preview presentation | Interim `preview.tsx` is logic-host chrome (e.g. stroke-count meta, “Your doodle · pick a style”); does not yet match approved Preview comps; static material orb assets not wired | Preview shows header + “Pick a style for your Dooji” + 2×2 static Gummy/Clay/Plush/Glossy tiles + Surprise me ✨ · **no user doodle** · no generation CTA | Update Preview presentation during visual implementation; keep tile/Surprise → cache/generate behavior |
 | `Creation.style` default | New creations set `style: 'gummy'` as data preference | Preview must not default-select Gummy in UI | Already separated via `selectedStyle: undefined` on Preview — keep that invariant |
 
 Preview immediate-generate, Result CTA-for-missing-style, cache-before-API, Surprise me randomness, Save vs generate, New Doodle prompts, and Library Creation-first model are implemented in the mobile product layer audited above.
