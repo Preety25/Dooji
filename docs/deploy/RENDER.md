@@ -1,7 +1,20 @@
 # Dooji production backend on Render
 
-Smallest path to host the existing `ThreadingHTTPServer` transform API with
-durable Postgres quota state. No FastAPI/ASGI migration. No object storage.
+Operational reference for the hosted transform API: current production state,
+required env, and how to redeploy. No FastAPI/ASGI migration. No object storage.
+
+## Current production state
+
+| Item | Status |
+|------|--------|
+| Web Service | **`dooji-api`** — live on Render |
+| Public API origin | `https://dooji-api.onrender.com` |
+| Provider | **xAI** / `grok-imagine-image-2.0` (`IMAGE_PROVIDER=xai`) |
+| Generation policy | **Postgres** (`DOOJI_POLICY=postgres` + `DATABASE_URL`) |
+| Health | `/health` and `/v1/health` verified healthy (includes Postgres readiness; does not call xAI) |
+| Mobile | Production configuration points `EXPO_PUBLIC_TRANSFORM_MODE=http` at this hosted origin |
+
+Baseline tag: `v0.1.0` on `product/mvp`.
 
 ## Services
 
@@ -72,10 +85,14 @@ DOOJI_ENV=production IMAGE_PROVIDER=xai DOOJI_POLICY=postgres \
   DATABASE_URL=... XAI_API_KEY=... python -m product.api.app
 ```
 
-## Manual Render steps still required
+## Redeploy / ops checklist
 
-1. Create Web Service from this repo (`product/mvp`) or Blueprint.
-2. Create Postgres and link `DATABASE_URL`.
-3. Set `XAI_API_KEY` as a secret.
-4. Confirm health check path `/health`.
-5. Deploy when ready (not done by the coding agent in Phase 3A).
+Use when changing code on `product/mvp`, rotating secrets, or recovering from an unhealthy deploy. Initial create + first deploy are already done.
+
+1. Confirm Web Service `dooji-api` tracks the intended branch (`product/mvp` / release tag).
+2. Confirm Postgres `dooji-quota` remains linked via `DATABASE_URL`.
+3. Confirm `XAI_API_KEY` is set as a Render secret (never in mobile / git).
+4. Confirm env matches the production table above (`DOOJI_ENV=production`, `IMAGE_PROVIDER=xai`, `DOOJI_POLICY=postgres`, kill switch / budget as intended).
+5. Deploy / clear build cache if needed; wait for service healthy.
+6. Verify `GET https://dooji-api.onrender.com/health` and `/v1/health` → healthy JSON (Postgres up).
+7. Smoke a mobile or HTTP transform against the hosted origin only when intentionally spending credits.
