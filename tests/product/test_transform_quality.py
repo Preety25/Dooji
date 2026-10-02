@@ -83,6 +83,92 @@ def test_run_postprocess_produces_transparent_canvas() -> None:
     assert im.getpixel((0, 0))[3] == 0
 
 
+def test_soft_gray_plate_removed_like_gummy_failure() -> None:
+    """Reproduce live gummy failure: ~215 gray plate + one white corner."""
+    from PIL import Image
+
+    def paint(px, w, h):
+        # Soft gray gradient plate (not pure white / not >=230 everywhere).
+        for y in range(h):
+            for x in range(w):
+                g = 215 + ((x + y) % 20)
+                px[x, y] = (g, g, min(255, g + 2), 255)
+        # Force one corner near-white like the live sample mix.
+        px[0, h - 1] = (255, 255, 255, 255)
+        # Saturated orange subject (gummy-like).
+        for y in range(30, 70):
+            for x in range(30, 70):
+                px[x, y] = (236, 89, 9, 255)
+        # Bright specular highlight inside subject (must survive).
+        for y in range(40, 48):
+            for x in range(40, 48):
+                px[x, y] = (250, 250, 250, 255)
+
+    raw = _rgba_png(100, 100, paint)
+    out, step = remove_background(raw, feather=0)
+    assert step.startswith("bg_removal:corner_flood_removed_"), step
+    im = Image.open(io.BytesIO(out)).convert("RGBA")
+    assert im.getpixel((0, 0))[3] == 0
+    assert im.getpixel((99, 0))[3] == 0
+    assert im.getpixel((0, 99))[3] == 0
+    assert im.getpixel((99, 99))[3] == 0
+    # Subject body + interior highlight preserved
+    assert im.getpixel((50, 50))[3] == 255
+    assert im.getpixel((50, 50))[:3] == (236, 89, 9)
+    assert im.getpixel((44, 44))[3] == 255
+    assert im.getpixel((44, 44))[0] >= 240
+
+
+def test_gradient_near_white_plate_fully_cleared() -> None:
+    """Glossy-like plate spanning ~230–255 must clear all corners."""
+    from PIL import Image
+
+    def paint(px, w, h):
+        for y in range(h):
+            for x in range(w):
+                v = 230 + (x * 25) // max(1, w - 1)
+                px[x, y] = (v, v, v, 255)
+        for y in range(35, 65):
+            for x in range(35, 65):
+                px[x, y] = (252, 125, 22, 255)
+
+    raw = _rgba_png(100, 100, paint)
+    result = run_postprocess(raw, size=64)
+    assert any(s.startswith("bg_removal:corner_flood") for s in result.steps)
+    im = Image.open(io.BytesIO(result.image_bytes)).convert("RGBA")
+    for x, y in ((0, 0), (63, 0), (0, 63), (63, 63)):
+        assert im.getpixel((x, y))[3] == 0, (x, y, im.getpixel((x, y)))
+    # Center of canvas should still contain opaque subject after normalize
+    assert im.getpixel((32, 32))[3] > 200
+
+
+def test_translucent_edge_color_not_eaten_as_plate() -> None:
+    """Light but chromatic subject edge must not match gray plate removal."""
+    from PIL import Image
+
+    def paint(px, w, h):
+        for y in range(h):
+            for x in range(w):
+                px[x, y] = (220, 220, 222, 255)
+        # Pale orange rim (chromatic) touching near center — not on border.
+        for y in range(25, 75):
+            for x in range(25, 75):
+                px[x, y] = (255, 190, 140, 255)
+        for y in range(35, 65):
+            for x in range(35, 65):
+                px[x, y] = (240, 100, 20, 255)
+
+    raw = _rgba_png(100, 100, paint)
+    out, step = remove_background(raw, feather=0)
+    assert step.startswith("bg_removal:corner_flood_removed_"), step
+    im = Image.open(io.BytesIO(out)).convert("RGBA")
+    assert im.getpixel((0, 0))[3] == 0
+    # Pale orange rim preserved
+    assert im.getpixel((30, 50))[3] == 255
+    assert im.getpixel((30, 50))[0] >= 240
+    assert im.getpixel((30, 50))[1] < 220
+
+
 def test_plush_prompt_rejects_photoreal_and_requires_transparent() -> None:
     style = load_style("plush", root=ROOT)
     prompt = compile_prompt(style=style, recognition=default_recognition())
