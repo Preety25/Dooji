@@ -423,3 +423,149 @@ describe('Library open destinations', () => {
     assert.ok(!cleanActions.includes('Discard changes'));
   });
 });
+
+describe('Creation multi-style variants (Library + Result persistence)', () => {
+  function fakeClient(calls: { n: number }): TransformClient {
+    return {
+      async transform(req) {
+        calls.n += 1;
+        return {
+          status: 'ok',
+          style: req.style,
+          transform_version: TRANSFORM_VERSION,
+          provider: 'mock',
+          image_base64: `fake_${req.style}_${calls.n}`,
+          metadata: {
+            // Server may echo product JSON version (plush 1.1.0).
+            style_version:
+              req.style === 'plush' ? '1.1.0' : STYLE_VERSIONS[req.style as StyleId],
+            style_id: req.style,
+          },
+        };
+      },
+    };
+  }
+
+  it('Gummy + Plush persist on one Creation; switch without regeneration', async () => {
+    const calls = { n: 0 };
+    const client = fakeClient(calls);
+    let creation = baseCreation({ id: 'multi_v1', saved: true });
+    for (const style of ['gummy', 'plush'] as StyleId[]) {
+      const r = await ensureStyleAsset({
+        creation,
+        style,
+        canvas: creation.canvas,
+        client,
+        rasterize: async () => 'doodle_b64',
+      });
+      assert.equal(r.kind, 'generated');
+      if (r.kind === 'generated') creation = r.creation;
+    }
+    assert.equal(calls.n, 2);
+    assert.equal(creation.id, 'multi_v1');
+    assert.equal(creation.assets.length, 2);
+
+    for (const style of ['gummy', 'plush', 'gummy'] as StyleId[]) {
+      const r = await ensureStyleAsset({
+        creation,
+        style,
+        canvas: creation.canvas,
+        client,
+        rasterize: async () => 'doodle_b64',
+      });
+      assert.equal(r.kind, 'cache_hit');
+      assert.equal(r.transformCalled, false);
+      assert.equal(r.creation.id, 'multi_v1');
+    }
+    assert.equal(calls.n, 2);
+  });
+
+  it('Library represents source + both generated variants after hydration', async () => {
+    const calls = { n: 0 };
+    let creation = baseCreation({ id: 'lib_multi', saved: true });
+    for (const style of ['gummy', 'plush'] as StyleId[]) {
+      const r = await ensureStyleAsset({
+        creation,
+        style,
+        canvas: creation.canvas,
+        client: fakeClient(calls),
+        rasterize: async () => 'doodle_b64',
+      });
+      if (r.kind === 'generated') creation = r.creation;
+    }
+
+    const hydrated = JSON.parse(JSON.stringify(creation)) as Creation;
+    const visible = assetsForCurrentSource(hydrated);
+    assert.equal(visible.length, 2);
+    assert.ok(visible.some((a) => a.style === 'gummy'));
+    assert.ok(visible.some((a) => a.style === 'plush'));
+
+    const openSource = planOpenCreation(hydrated, { destination: 'canvas' });
+    assert.equal(openSource.phase, 'canvas');
+    assert.equal(openSource.activeAssetId, undefined);
+
+    const plush = visible.find((a) => a.style === 'plush');
+    assert.ok(plush);
+    const openGen = planOpenCreation(hydrated, {
+      destination: 'result',
+      assetId: plush!.id,
+    });
+    assert.equal(openGen.phase, 'result');
+    assert.equal(openGen.activeAssetId, plush!.id);
+    assert.equal(openGen.selectedStyle, 'plush');
+
+    // Variants stay on the same Creation — never a new id.
+    assert.equal(hydrated.id, 'lib_multi');
+    assert.ok(hydrated.assets.every((a) => a.creationId === 'lib_multi'));
+  });
+
+  it('edit-draft Save/Discard still preserves baseline variants', () => {
+    const strokes = [stroke('s1', [[10, 10], [40, 50], [70, 20]])];
+    const canvas = { width: 200, height: 200 };
+    const fp = doodleFingerprint(strokes, canvas);
+    const baseline = baseCreation({
+      id: 'edit_keep',
+      saved: true,
+      strokes,
+      assets: [
+        {
+          id: 'a_g',
+          creationId: 'edit_keep',
+          style: 'gummy',
+          imageUri: 'uri:g',
+          doodleFingerprint: fp,
+          transformVersion: TRANSFORM_VERSION,
+          styleVersion: STYLE_VERSIONS.gummy,
+          semanticVersion: 'product.mvp.semantic.v1',
+          createdAt: '2026-01-01T00:00:00.000Z',
+        },
+        {
+          id: 'a_p',
+          creationId: 'edit_keep',
+          style: 'plush',
+          imageUri: 'uri:p',
+          doodleFingerprint: fp,
+          transformVersion: TRANSFORM_VERSION,
+          styleVersion: STYLE_VERSIONS.plush,
+          semanticVersion: 'product.mvp.semantic.v1',
+          createdAt: '2026-01-01T00:01:00.000Z',
+        },
+      ],
+    });
+    assert.equal(assetsForCurrentSource(baseline).length, 2);
+
+    // Discard restores baseline — both variants intact.
+    const restored = cloneCreation(baseline);
+    assert.equal(assetsForCurrentSource(restored).length, 2);
+    assert.equal(
+      evaluateNavigationGuard({
+        isEditDraft: false,
+        creation: restored,
+        dirty: false,
+        hasContent: true,
+      }),
+      'none',
+    );
+    assert.equal(guardPromptFor('none'), null);
+  });
+});

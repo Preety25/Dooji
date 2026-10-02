@@ -5,11 +5,11 @@
 import type { StyleId } from '../models/types';
 import { TRANSFORM_VERSION } from '../transform/contracts';
 
-/** Current style pack versions (see product/styles/*.json). */
+/** Current style pack versions (see product/styles/*.json). Must stay in sync. */
 export const STYLE_VERSIONS: Record<StyleId, string> = {
   gummy: '1.0.0',
   clay: '1.0.0',
-  plush: '1.0.0',
+  plush: '1.1.0',
   glossy: '1.0.0',
 };
 

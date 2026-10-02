@@ -201,19 +201,27 @@ export async function ensureStyleAsset(
       : `data:image/png;base64,${result.image_base64}`;
     const meta = result.metadata || {};
     const styleVersionFromServer =
-      typeof meta.style_version === 'string' ? meta.style_version : versions.styleVersion;
+      typeof meta.style_version === 'string' ? meta.style_version : undefined;
+    // Cache identity MUST use the mobile style pin (STYLE_VERSIONS), not the
+    // server echo. A mismatch (e.g. plush 1.1.0 server vs 1.0.0 client pin)
+    // made generated variants invisible to lookupCachedAsset / Library.
     const asset: GeneratedAsset = {
       id: newId('asset'),
       creationId: creation.id,
       style,
       imageUri,
       transformVersion: result.transform_version || versions.transformVersion,
-      styleVersion: styleVersionFromServer,
+      styleVersion: versions.styleVersion,
       semanticVersion: versions.semanticVersion,
       doodleFingerprint: fingerprint,
       provider: result.provider ?? undefined,
       createdAt: nowIso(),
-      metadata: result.metadata,
+      metadata: {
+        ...meta,
+        ...(styleVersionFromServer
+          ? { style_version_server: styleVersionFromServer }
+          : {}),
+      },
     };
     const done: GenerationJob = {
       ...job,

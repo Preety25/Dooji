@@ -301,10 +301,73 @@ describe('generation cache', () => {
     assert.equal(lookupCachedAsset(legacy, 'gummy'), undefined);
   });
 
+  it('H2: server style_version echo must not break Plush cache / Library visibility', async () => {
+    // Reproduces phone bug: product/styles/plush.json is 1.1.0; server echoes that.
+    // Cache identity must use STYLE_VERSIONS.plush so lookup / assetsForCurrentSource work.
+    assert.equal(STYLE_VERSIONS.plush, '1.1.0');
+    const calls = { n: 0 };
+    const client: TransformClient = {
+      async transform(req) {
+        calls.n += 1;
+        return {
+          status: 'ok',
+          style: req.style,
+          transform_version: TRANSFORM_VERSION,
+          provider: 'mock',
+          image_base64: `fake_${req.style}_${calls.n}`,
+          // Deliberately echo a server style_version; ensure must pin local STYLE_VERSIONS.
+          metadata: {
+            style_version: req.style === 'plush' ? '1.1.0' : STYLE_VERSIONS[req.style as StyleId],
+            style_id: req.style,
+          },
+        };
+      },
+    };
+    let creation = baseCreation({ id: 'creation_plush_pin' });
+    for (const style of ['gummy', 'plush'] as StyleId[]) {
+      const r = await ensureStyleAsset({
+        creation,
+        style,
+        canvas: creation.canvas,
+        client,
+        rasterize: rasterStub,
+      });
+      assert.equal(r.kind, 'generated');
+      if (r.kind === 'generated') {
+        assert.equal(r.asset.styleVersion, STYLE_VERSIONS[style]);
+        creation = r.creation;
+      }
+    }
+    assert.equal(calls.n, 2);
+    assert.ok(lookupCachedAsset(creation, 'gummy'));
+    assert.ok(lookupCachedAsset(creation, 'plush'));
+
+    // Switch Plush → Gummy → Plush: zero new transforms
+    for (const style of ['plush', 'gummy', 'plush'] as StyleId[]) {
+      const r = await ensureStyleAsset({
+        creation,
+        style,
+        canvas: creation.canvas,
+        client,
+        rasterize: rasterStub,
+      });
+      assert.equal(r.kind, 'cache_hit');
+      assert.equal(r.transformCalled, false);
+    }
+    assert.equal(calls.n, 2);
+
+    // Library hydration
+    const hydrated = JSON.parse(JSON.stringify(creation)) as Creation;
+    assert.equal(hydrated.assets.length, 2);
+    assert.ok(lookupCachedAsset(hydrated, 'gummy'));
+    assert.ok(lookupCachedAsset(hydrated, 'plush'));
+  });
+
   it('H: provider independence — fake client only; SEMANTIC/TRANSFORM pins present', async () => {
     assert.equal(TRANSFORM_VERSION, 'product.mvp.v1');
     assert.ok(SEMANTIC_VERSION.length > 0);
     assert.equal(STYLE_VERSIONS.gummy, '1.0.0');
+    assert.equal(STYLE_VERSIONS.plush, '1.1.0');
     const calls = { n: 0 };
     const client: TransformClient = {
       async transform(req) {
