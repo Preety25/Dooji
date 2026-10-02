@@ -4,6 +4,7 @@ Secrets: reads XAI_API_KEY from the environment only. Never logs or returns the 
 """
 from __future__ import annotations
 
+import concurrent.futures
 import os
 import tempfile
 from pathlib import Path
@@ -12,6 +13,11 @@ from lab.v4.generative import xai_edit
 from product.providers.base import (
     ProviderGenerateRequest,
     ProviderGenerateResult,
+)
+from product.runtime import (
+    provider_download_timeout_seconds,
+    provider_http_timeout_seconds,
+    provider_timeout_seconds,
 )
 
 
@@ -42,6 +48,21 @@ class XAIImageProvider:
                 metadata={"key_present": False},
             )
 
+        deadline = provider_timeout_seconds()
+        with concurrent.futures.ThreadPoolExecutor(max_workers=1) as pool:
+            fut = pool.submit(self._generate_bounded, request)
+            try:
+                return fut.result(timeout=deadline)
+            except concurrent.futures.TimeoutError:
+                return ProviderGenerateResult(
+                    ok=False,
+                    provider=self.name,
+                    model=self.model,
+                    error="provider_timeout",
+                    metadata={"timeout_s": deadline},
+                )
+
+    def _generate_bounded(self, request: ProviderGenerateRequest) -> ProviderGenerateResult:
         work = Path(request.work_dir) if request.work_dir else None
         tmp_ctx = None
         if work is None:
@@ -69,6 +90,8 @@ class XAIImageProvider:
                 n=request.n,
                 prefer_multi_image=bool(style_paths),
                 allow_single_fallback=self.allow_single_fallback,
+                http_timeout_s=provider_http_timeout_seconds(),
+                download_timeout_s=provider_download_timeout_seconds(),
             )
             # Drop prompt from provider meta before it fans out (keep length only).
             safe_meta = {

@@ -140,7 +140,9 @@ def _post_json(payload: dict, api_key: str, timeout_s: float = 180.0) -> tuple[i
         return 0, None, f"{type(exc).__name__}: {exc}", latency
 
 
-def _extract_image_bytes(parsed: dict) -> tuple[bytes | None, dict]:
+def _extract_image_bytes(
+    parsed: dict, *, download_timeout_s: float = 120.0
+) -> tuple[bytes | None, dict]:
     """Pull image bytes from b64_json or download URL. Returns (bytes, meta)."""
     meta: dict[str, Any] = {}
     data = parsed.get("data") if isinstance(parsed, dict) else None
@@ -174,7 +176,7 @@ def _extract_image_bytes(parsed: dict) -> tuple[bytes | None, dict]:
     url = first.get("url")
     if url and isinstance(url, str) and url.startswith("http"):
         try:
-            with urllib.request.urlopen(url, timeout=120) as resp:
+            with urllib.request.urlopen(url, timeout=download_timeout_s) as resp:
                 return resp.read(), {**meta, "response_format_used": "url_download"}
         except Exception as exc:
             return None, {**meta, "extract_error": f"url download failed: {type(exc).__name__}"}
@@ -206,6 +208,8 @@ def edit_image(
     response_format: str = DEFAULT_RESPONSE_FORMAT,
     prefer_multi_image: bool = True,
     allow_single_fallback: bool = True,
+    http_timeout_s: float = 180.0,
+    download_timeout_s: float = 120.0,
 ) -> dict:
     """Call xAI image edits. Prefer multi-image (doodle + style ref(s)); fall back on 400/422.
 
@@ -258,7 +262,9 @@ def edit_image(
             prompt, resolution=resolution, quality=quality, n=n, response_format=response_format
         )
         payload["image"] = image_field
-        status, parsed, raw, latency_ms = _post_json(payload, api_key)
+        status, parsed, raw, latency_ms = _post_json(
+            payload, api_key, timeout_s=http_timeout_s
+        )
         attempt = {
             "label": label,
             "http_status": status,
@@ -267,7 +273,9 @@ def edit_image(
             "request_shape": "image:list" if isinstance(image_field, list) else "image:object",
         }
         if status == 200 and isinstance(parsed, dict):
-            img_bytes, extract_meta = _extract_image_bytes(parsed)
+            img_bytes, extract_meta = _extract_image_bytes(
+                parsed, download_timeout_s=download_timeout_s
+            )
             attempt["extract"] = {k: v for k, v in extract_meta.items() if k != "revised_prompt"}
             # revised_prompt can be huge / echo user content; keep length only
             if "revised_prompt" in extract_meta:
@@ -318,7 +326,9 @@ def edit_image(
                 prompt, resolution=resolution, quality=quality, n=n, response_format=response_format
             )
             payload_images["images"] = img_list
-            status, parsed, raw, latency_ms = _post_json(payload_images, api_key)
+            status, parsed, raw, latency_ms = _post_json(
+                payload_images, api_key, timeout_s=http_timeout_s
+            )
             attempt = {
                 "label": label,
                 "http_status": status,
@@ -328,7 +338,9 @@ def edit_image(
                 "style_ref_count": len(img_list) - 1,
             }
             if status == 200 and isinstance(parsed, dict):
-                img_bytes, extract_meta = _extract_image_bytes(parsed)
+                img_bytes, extract_meta = _extract_image_bytes(
+                    parsed, download_timeout_s=download_timeout_s
+                )
                 attempt["extract"] = {k: v for k, v in extract_meta.items() if k != "revised_prompt"}
                 if "revised_prompt" in extract_meta:
                     attempt["revised_prompt_len"] = len(str(extract_meta["revised_prompt"]))

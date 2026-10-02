@@ -17,8 +17,23 @@ from product.policy.generation_policy import (
     reset_dev_quota,
 )
 from product.providers import get_provider
+from product.runtime import (
+    allow_doodle_path,
+    allow_dry_run,
+    generations_disabled,
+    is_production,
+    max_body_bytes,
+    max_image_bytes,
+    max_stroke_count,
+    resolve_bind_host,
+    resolve_bind_port,
+)
 from product.transform.contracts import TransformOptions, TransformRequest
 from product.transform.service import TransformService
+
+
+class PayloadTooLarge(ValueError):
+    """Request exceeded configured size limits."""
 
 
 def parse_transform_body(payload: dict[str, Any]) -> TransformRequest:
@@ -31,13 +46,21 @@ def parse_transform_body(payload: dict[str, Any]) -> TransformRequest:
 
     Accepted image fields (first wins for raster bytes):
       - doodle_base64 / doodle_png_base64
-      - doodle_path (server-local; useful for smoke / ops)
+      - doodle_path (dev/ops only — never in production)
       - strokes alone (server raster fallback via lab.v3.raster)
     """
     opts_raw = payload.get("options") or {}
+    dry_run = bool(opts_raw.get("dry_run") or False)
+    if dry_run and not allow_dry_run():
+        raise ValueError("dry_run is not allowed in production")
+
+    size = int(opts_raw.get("size") or 1024)
+    if size < 64 or size > 2048:
+        raise ValueError("options.size out of range")
+
     options = TransformOptions(
-        size=int(opts_raw.get("size") or 1024),
-        dry_run=bool(opts_raw.get("dry_run") or False),
+        size=size,
+        dry_run=dry_run,
         recognition=opts_raw.get("recognition"),
     )
     doodle_png = None
@@ -45,13 +68,37 @@ def parse_transform_body(payload: dict[str, Any]) -> TransformRequest:
     if b64:
         if isinstance(b64, str) and "," in b64 and b64.strip().startswith("data:"):
             b64 = b64.split(",", 1)[1]
+        # Bound decoded size before allocate: base64 expands ~4/3.
+        if isinstance(b64, str) and (len(b64) * 3) // 4 > max_image_bytes():
+            raise PayloadTooLarge("doodle image exceeds size limit")
         doodle_png = base64.b64decode(b64)
+        if len(doodle_png) > max_image_bytes():
+            raise PayloadTooLarge("doodle image exceeds size limit")
+
+    doodle_path = payload.get("doodle_path")
+    if doodle_path:
+        if not allow_doodle_path():
+            raise ValueError("doodle_path is not allowed")
+        if not isinstance(doodle_path, str) or ".." in doodle_path.replace("\\", "/"):
+            raise ValueError("invalid doodle_path")
+
+    strokes = payload.get("strokes")
+    if strokes is not None:
+        if isinstance(strokes, list):
+            count = len(strokes)
+        elif isinstance(strokes, dict):
+            inner = strokes.get("strokes")
+            count = len(inner) if isinstance(inner, list) else 0
+        else:
+            raise ValueError("strokes must be a list or stroke document")
+        if count > max_stroke_count():
+            raise PayloadTooLarge("stroke count exceeds limit")
 
     return TransformRequest(
         style=str(payload.get("style") or ""),
         doodle_png=doodle_png,
-        doodle_path=payload.get("doodle_path"),
-        strokes=payload.get("strokes"),
+        doodle_path=doodle_path if allow_doodle_path() else None,
+        strokes=strokes,
         client_doodle_id=payload.get("client_doodle_id"),
         options=options,
     )
@@ -67,7 +114,7 @@ def handle_transform(
 ) -> dict[str, Any]:
     """Core handler used by HTTP stub and unit tests.
 
-    Flow: parse → GenerationPolicy (cache is client-side) → provider → response.
+    Flow: parse → kill switch → GenerationPolicy → provider → response.
     Cache hits never reach this handler from a well-behaved client.
     """
     req = parse_transform_body(payload)
@@ -80,7 +127,20 @@ def handle_transform(
     ip = client_ip or payload.get("client_ip")
     pol = policy if policy is not None else get_generation_policy()
 
-    # dry_run skips quota — used for smoke / CI without burning budget
+    # Emergency kill switch — before quota accounting / provider.
+    if generations_disabled() and not req.options.dry_run:
+        return {
+            "status": "error",
+            "style": req.style,
+            "transform_version": "product.mvp.v1",
+            "error": "generations_disabled",
+            "metadata": {
+                "reason": "generations_disabled",
+                "message": "New generations are temporarily unavailable. Please try again later.",
+            },
+        }
+
+    # dry_run skips quota — local/dev only (rejected in production above).
     if not req.options.dry_run:
         decision = pol.check(client_id=str(anon_id), ip=ip)
         if not decision.allowed:
@@ -98,11 +158,12 @@ def handle_transform(
                 },
             }
 
-    provider = get_provider(provider_name) if provider_name else get_provider(
-        "mock" if req.options.dry_run else None
-    )
     if req.options.dry_run:
         provider = get_provider("mock")
+    elif provider_name:
+        provider = get_provider(provider_name)
+    else:
+        provider = get_provider(None)
 
     if not req.options.dry_run:
         pol.record_provider_attempt(
@@ -174,7 +235,27 @@ class TransformHandler(BaseHTTPRequestHandler):
     def do_POST(self) -> None:  # noqa: N802
         path = urlparse(self.path).path
         length = int(self.headers.get("Content-Length") or 0)
+        if length > max_body_bytes():
+            self._send(
+                413,
+                {
+                    "status": "error",
+                    "error": "payload_too_large",
+                    "metadata": {"max_body_bytes": max_body_bytes()},
+                },
+            )
+            return
         raw = self.rfile.read(length) if length else b"{}"
+        if len(raw) > max_body_bytes():
+            self._send(
+                413,
+                {
+                    "status": "error",
+                    "error": "payload_too_large",
+                    "metadata": {"max_body_bytes": max_body_bytes()},
+                },
+            )
+            return
         try:
             payload = json.loads(raw.decode("utf-8") or "{}")
         except json.JSONDecodeError:
@@ -183,7 +264,7 @@ class TransformHandler(BaseHTTPRequestHandler):
 
         # Development-only quota reset — 404 unless DOOJI_DEV_TOOLS=1.
         if path in ("/v1/dev/reset-quota", "/dev/reset-quota"):
-            if not dev_tools_enabled():
+            if not dev_tools_enabled() or is_production():
                 self._send(404, {"error": "not_found"})
                 return
             try:
@@ -211,36 +292,44 @@ class TransformHandler(BaseHTTPRequestHandler):
                 code = 200
             elif status == "rate_limited":
                 code = 429
+            elif body.get("error") == "generations_disabled":
+                code = 503
             else:
                 code = 502
             self._send(code, body)
+        except PayloadTooLarge as exc:
+            self._send(
+                413,
+                {"status": "error", "error": "payload_too_large", "metadata": {"detail": str(exc)}},
+            )
         except ValueError as exc:
             self._send(400, {"status": "error", "error": str(exc)})
         except Exception as exc:  # noqa: BLE001
             self._send(500, {"status": "error", "error": f"{type(exc).__name__}"})
 
 
-def serve(host: str = "0.0.0.0", port: int = 8080) -> None:
+def serve(host: str | None = None, port: int | None = None) -> None:
     """Serve the transform stub.
 
     Default bind is 0.0.0.0 so a physical phone on the same LAN can reach
     POST /v1/transform. Override with DOOJI_HOST=127.0.0.1 for localhost-only.
+    Port: DOOJI_PORT, else platform PORT, else 8080.
     """
+    host = host if host is not None else resolve_bind_host()
+    port = port if port is not None else resolve_bind_port()
     httpd = ThreadingHTTPServer((host, port), TransformHandler)
-    tools = "ON" if dev_tools_enabled() else "off"
+    tools = "ON" if dev_tools_enabled() and not is_production() else "off"
+    env = "production" if is_production() else "development"
     print(
         f"Dooji transform listening on http://{host}:{port}  "
-        f"(POST /v1/transform; DOOJI_DEV_TOOLS={tools})"
+        f"(POST /v1/transform; env={env}; DOOJI_DEV_TOOLS={tools})"
     )
-    if dev_tools_enabled():
+    if tools == "ON":
         print("  DEV: POST /v1/dev/reset-quota  (local quota reset)")
+    if generations_disabled():
+        print("  KILL SWITCH: DOOJI_GENERATIONS_DISABLED is active")
     httpd.serve_forever()
 
 
 if __name__ == "__main__":
-    import os
-
-    serve(
-        host=os.environ.get("DOOJI_HOST", "0.0.0.0"),
-        port=int(os.environ.get("DOOJI_PORT", "8080")),
-    )
+    serve()

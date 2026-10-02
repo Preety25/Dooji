@@ -8,8 +8,7 @@ let singleton: TransformClient | null = null;
 
 /**
  * App entry to the transform boundary.
- * Default: MOCK (local V4-style samples). Set EXPO_PUBLIC_TRANSFORM_MODE=http
- * + EXPO_PUBLIC_TRANSFORM_API_URL to hit product/api POST /v1/transform.
+ * Development default: MOCK. Production builds require http + HTTPS URL (fail closed).
  */
 export function getTransformClient(): TransformClient {
   if (!singleton) {

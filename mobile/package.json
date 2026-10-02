@@ -44,7 +44,7 @@
     "ios": "expo start --ios",
     "web": "expo start --web",
     "typecheck": "tsc --noEmit",
-    "test:generation": "tsx --test src/generation/generationCache.test.ts src/product/productFlow.test.ts src/product/draftState.test.ts"
+    "test:generation": "tsx --test src/generation/generationCache.test.ts src/product/productFlow.test.ts src/product/draftState.test.ts src/transform/clientConfig.test.ts"
   },
   "private": true
 }
