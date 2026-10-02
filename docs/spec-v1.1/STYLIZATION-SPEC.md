@@ -1,16 +1,18 @@
 # Stylization Spec — Doodle Emoji
 
-**Document role:** Visual source of truth for the transformation engine.  
-**Status:** Binding art-direction + engine behavior spec for Polish mode  
+> **Superseded for current product behavior by [`../spec-v1.2/`](../spec-v1.2/)** — Intent-Preserving Stylized Reconstruction. Keep this file as the v1.1 historical record.
+
+**Document role:** Visual source of truth for the transformation engine (v1.1).  
+**Status:** Historical — superseded by stylization-spec.v1.2  
 **Version:** stylization-spec.v1.1 (2026-09-23)  
-**Previous:** 1.0 archived at [`archive/v1.0/STYLIZATION-SPEC.md`](./archive/v1.0/STYLIZATION-SPEC.md)  
+**Previous:** 1.0 archived at archive/v1.0 (not in repo)  
 **Sources:** Product_v2; Doodle-Emoji Recipe.pdf (art-direction reference only — do not reproduce specific characters)
 
 **Companion documents:**
 - [`TRANSFORMATION-PRINCIPLES.md`](./TRANSFORMATION-PRINCIPLES.md) — Recognition-Assisted Polish, spectrum 1–5, completion budget, confidence, preserve/complete, face rule, examples
 - [`STYLE-RECIPES.md`](./STYLE-RECIPES.md) — versioned recipes for `glossy.v1`, `gummy.v1`, `clay.v1`, `plush.v1` (styles do not own semantics)
 - [`CHANGELOG-v1.1.md`](./CHANGELOG-v1.1.md) — concise v1.0 → v1.1 summary
-- Local reference copy: [`refs/Product_v2.md`](./refs/Product_v2.md)
+- Local reference copy: [`../Product_v2.md`](../Product_v2.md)
 
 ---
 
@@ -292,7 +294,7 @@ Explicitly out of scope for this specification effort:
 | Recognition-Assisted Polish, spectrum 1–5, budget, confidence, preserve/complete, face rule, examples, safeguards | [`TRANSFORMATION-PRINCIPLES.md`](./TRANSFORMATION-PRINCIPLES.md) |
 | Per-style geometry/material/lighting/camera/color + comparison; style≠semantics | [`STYLE-RECIPES.md`](./STYLE-RECIPES.md) |
 | v1.1 change summary | [`CHANGELOG-v1.1.md`](./CHANGELOG-v1.1.md) |
-| Product promise, moat, MVP framing | [`refs/Product_v2.md`](./refs/Product_v2.md) |
+| Product promise, moat, MVP framing | [`../Product_v2.md`](../Product_v2.md) |
 | Art-direction page images (material language only) | `refs/pdf-pages/page-01.png` … `page-10.png` |
 
 ---
@@ -317,4 +319,4 @@ A Polish implementation aligns with this spec when:
 
 ---
 
-*End of STYLIZATION-SPEC.md — visual source of truth for the transformation engine (v1.1).*
+*End of STYLIZATION-SPEC.md — historical v1.1 record (superseded by docs/spec-v1.2/).*

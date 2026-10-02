@@ -1,23 +1,19 @@
-# Style Recipes — Doodle Emoji
-
-> **Superseded for current product behavior by [../spec-v1.2/STYLE-RECIPES.md](../spec-v1.2/STYLE-RECIPES.md) and the binding [../spec-v1.2/DOOJI-TRANSFORMAT-SPEC.md](../spec-v1.2/DOOJI-TRANSFORMAT-SPEC.md). Keep this file as the v1.1 historical record.
-
+# Style Recipes — Dooji
 
 **Document role:** Versioned visual recipes for hero styles.  
 **Status:** Art-direction source of truth for style parameters (starting ranges)  
-**Version:** 1.1 (2026-09-23)  
-**Previous:** 1.0 archived at archive/v1.0 (not in repo)  
+**Version:** 1.2 (2026-10-02)  
+**Previous:** 1.1 at [`../spec-v1.1/STYLE-RECIPES.md`](../spec-v1.1/STYLE-RECIPES.md)  
 **Canonical companions:**
-- [`TRANSFORMATION-PRINCIPLES.md`](./TRANSFORMATION-PRINCIPLES.md) — Recognition-Assisted Polish, spectrum, completion budget, face rule (semantic)
-- [`STYLIZATION-SPEC.md`](./STYLIZATION-SPEC.md) — engine visual source of truth, pipeline, rubric
-- [`CHANGELOG-v1.1.md`](./CHANGELOG-v1.1.md) — v1.0 → v1.1 summary
+- [`DOOJI-TRANSFORMAT-SPEC.md`](./DOOJI-TRANSFORMAT-SPEC.md) — binding Intent-Preserving Stylized Reconstruction contract
+- [`TRANSFORMAT-PRINCIPLES.md`](./TRANSFORMAT-PRINCIPLES.md) — anchors, reconstruction budget, face rule
+- [`STYLIZATION-SPEC.md`](./STYLIZATION-SPEC.md) — engine pipeline, rubric
+- [`CHANGELOG-v1.2.md`](./CHANGELOG-v1.2.md)
 **Sources:** Product_v2; Doodle-Emoji Recipe.pdf (art-direction reference only — material language, not character copying)
 
-### What changed from 1.0 (brief)
+### What changed for v1.2 (brief)
 
-Material / geometry / lighting / camera / color / presentation guidance for `glossy.v1`, `gummy.v1`, `clay.v1`, and `plush.v1` is largely **unchanged**. v1.1 adds an explicit rule that **style recipes do not own semantics**, and revises face/invention language so the **style layer never invents** while the **semantic / Transformation Plan layer** may request limited face or structural completion per [`TRANSFORMATION-PRINCIPLES.md`](./TRANSFORMATION-PRINCIPLES.md). Lab relationship remains: align later; do not modify lab now.
-
----
+Material / geometry / lighting / camera / color / presentation guidance for glossy / gummy / clay / plush is largely **unchanged**. v1.2 restates that **style recipes do not own semantics**, apply **after** Intent-Preserving Reconstruction, and should be **pushed hard** once creative anchors are locked. Style must not preserve rough source geometry merely to look "handmade." Plush remains stylized stuffed-toy — not photoreal fur.
 
 ## 0. How to read this document
 
@@ -49,14 +45,14 @@ Where prior Blender lab recipes exist (`gummy.v1`, `clay.v1`, `plush.v1`, plus v
 
 **Style recipes must not invent faces, accessories, or object parts.**
 
-Any repair or semantic completion comes from the **Transformation Plan / semantic layer upstream** ([`TRANSFORMATION-PRINCIPLES.md`](./TRANSFORMATION-PRINCIPLES.md), [`STYLIZATION-SPEC.md`](./STYLIZATION-SPEC.md) pipeline). Style **only styles** whatever geometry the plan produces.
+Any repair or semantic reconstruction comes from the **upstream Intent-Preserving Reconstruction layer** ([`DOOJI-TRANSFORMAT-SPEC.md`](./DOOJI-TRANSFORMAT-SPEC.md), [`TRANSFORMAT-PRINCIPLES.md`](./TRANSFORMAT-PRINCIPLES.md)). Style **only styles** whatever reconstructed geometry the plan produces — and should transform that form substantially into the style's material dialect.
 
 | Layer | Owns | Must not |
 |-------|------|----------|
-| Semantic / Transformation Plan | Subject inference, confidence, Level 0–2 completion, limited face completion when rules allow | Creative reimagination; stock redesign |
-| Style recipe (this document) | Material, lighting, camera, presentation, style-appropriate restyling of planned marks | Decide what the doodle "is"; invent faces, accessories, or parts not in the plan |
+| Semantic / reconstruction | Subject inference, anchors, Level 0–2 reconstruction, limited face completion when rules allow | Creative reimagination; stock redesign; preserving execution mistakes as identity |
+| Style recipe (this document) | Material, lighting, camera, presentation, aggressive restyling of reconstructed form | Decide what the doodle "is"; invent faces, accessories, or parts not in the plan; leave rough doodle geometry uncorrected "for handmade feel" |
 
-Pipeline order: shape + semantic analysis → confidence → Transformation Plan → **geometry** → **material (style)** → lighting → presentation → render.
+Pipeline order: understand → identify anchors → reconstruct geometry → polish → **material (style)** → lighting → presentation → render.
 
 ### 0.3 Shared form language (all styles)
 
@@ -313,7 +309,7 @@ Prior lab `clay.v1.json` / `clay_claymorph.v1.json` used extrusion + remesh + ma
 
 Short-pile / needle-felt plush: stuffed spheres and ovoids, extreme soft edges, fiber fringe on silhouette, soft AO at joints. Art-direction cue from Doodle-Emoji Recipe.pdf 3D Plush sheet and plush teddy transform: fur texture replaces crayon scribble; color zones map 1:1 (including pads / cheeks / inner ears when drawn or planned); facial marks — when present in the plan — preserved as bead / embroidery-like; white unfilled snout/belly → complementary light plush fill of the **same local material**, not style-invented features.
 
-If the Transformation Plan authorizes limited facial completion for a HIGH-confidence teddy/animal with partial cues ([`TRANSFORMATION-PRINCIPLES.md`](./TRANSFORMATION-PRINCIPLES.md) §9), plush restyles those planned marks. The plush recipe itself never invents a face.
+If the Transformation Plan authorizes limited facial completion for a HIGH-confidence teddy/animal with partial cues ([`TRANSFORMATION-PRINCIPLES.md`](./TRANSFORMAT-PRINCIPLES.md) §9), plush restyles those planned marks. The plush recipe itself never invents a face.
 
 ### 5.2 Geometry recipe (STARTING RANGES)
 

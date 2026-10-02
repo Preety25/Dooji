@@ -477,9 +477,10 @@ V43_STYLE_LOOK = {
         "NOT fuzzy plush, NOT clearcoat plastic."
     ),
     "plush": (
-        "PLUSH material: stuffed fuzzy short-pile soft toy; visible nap/fuzz texture; soft "
-        "compression; cozy fabric feel; clearly different from smooth clay. Subtle seams only if "
-        "natural. NOT smooth clay, NOT glossy plastic, NOT translucent jelly, NOT hard vinyl."
+        "PLUSH material: stylized soft stuffed designer toy / short-pile felted soft sculpture; "
+        "simplified puffy volume; subtle controlled fabric nap; soft compression. "
+        "NOT photoreal fur, NOT long individual hairs, NOT smooth clay, NOT glossy plastic, "
+        "NOT translucent jelly, NOT hard vinyl."
     ),
     "glossy": (
         "GLOSSY material: SOLID opaque polished resin / lacquered vinyl / hard-candy toy "
@@ -610,29 +611,38 @@ def build_v43_multi_style_prompt(
 # --- V4.4 semantic parsing + style guardrails -----------------------------
 
 V44_NORTH_STAR = (
-    'Core: "Draw something messy. We understand what you meant and make YOUR version beautiful."'
+    'Core: "Draw something messy. Dooji understands what you meant, cleans it up, '
+    'and makes YOUR version beautiful." '
+    "Preserve the decisions, not the mistakes."
 )
 
 V44_PRIORITY = (
     "PRIORITY HIERARCHY (binding — lower never overrides higher):\n"
-    "1) original doodle  2) stroke-role analysis  3) semantic recognition\n"
-    "4) transform rules  5) style reference  6) generative creativity."
+    "1) creative intent from the doodle (identity, expression, pose, orientation, "
+    "distinctive features)  2) stroke-role / structural analysis  "
+    "3) semantic reconstruction  4) transform rules  5) style reference  "
+    "6) generative creativity.\n"
+    "Exact stroke geometry is NOT a top priority — reconstruct poor execution freely."
 )
 
 V44_ELASTIC = (
-    "ELASTIC FIDELITY: improve execution aggressively; preserve intent conservatively.\n"
-    "OK: smooth contours; improve proportion/alignment; close broken structural gaps; "
-    "dimensional/plump/toy-like; rich material finish; enrich saturation/depth.\n"
-    "NOT OK: replace identity; invent unsupported parts/faces; change component count; "
-    "copy style-sheet subjects/poses/faces/palette assignment/decorative objects; "
-    "treat interior marks as independent floating objects."
+    "INTENT-PRESERVING RECONSTRUCTION: treat the doodle as a rough design sketch, "
+    "not finished geometry. Reconstruct cleanly; polish aggressively; then stylize hard.\n"
+    "Similarity is semantic, expressive, and compositional — NOT pixel- or stroke-level.\n"
+    "OK: substantial geometry reconstruction; smooth/regularize contours; repair joins; "
+    "close obvious gaps; rebuild malformed appendages; improve proportion/alignment when "
+    "it clarifies intent; dimensional/plump/toy-like volume; rich material finish.\n"
+    "NOT OK: replace identity; invent unsupported parts/faces/accessories; casually change "
+    "expression/pose/orientation; copy style-sheet subjects/poses/faces/palette; "
+    "merely inflate/trace rough strokes; treat interior marks as independent floating objects; "
+    "turn the result into a generic canonical stock object."
 )
 
 V44_STYLIZED_DIM = (
     "STYLIZED DIMENSIONALITY: premium 3D sticker / designer toy / soft sculpture / "
     "candy illustration — plump charming volume. "
     "NOT photoreal, NOT product photo, NOT CAD extrusion, NOT flat bevel slab, "
-    "NOT scene/floor/text."
+    "NOT scene/floor/text, NOT photographic fur."
 )
 
 V44_STYLE_LOOK = {
@@ -647,8 +657,10 @@ V44_STYLE_LOOK = {
         "NOT translucent gummy, NOT fuzzy plush, NOT clearcoat plastic, NOT ceramic photo."
     ),
     "plush": (
-        "PLUSH material ONLY: stuffed fuzzy short-pile soft toy; visible nap/fuzz; soft "
-        "compression; cozy fabric. NOT smooth clay, NOT glossy plastic, NOT translucent jelly."
+        "PLUSH material ONLY: stylized soft stuffed designer toy / short-pile felted soft "
+        "sculpture; simplified puffy volume; subtle controlled fabric nap; soft compression; "
+        "matte cozy lighting. NOT photoreal fur, NOT long individual hairs, NOT extreme fiber "
+        "detail, NOT animal photography, NOT smooth clay, NOT glossy plastic, NOT jelly."
     ),
     "glossy": (
         "GLOSSY material ONLY: SOLID opaque polished resin / lacquered vinyl / hard-candy toy "
@@ -836,12 +848,17 @@ def build_v44_semantic_prompt(
         f"{color_block}"
         f"{special}"
         "\n"
-        "Hard preserve:\n"
+        "Creative anchors to preserve (VERY STRONG):\n"
         "- Absolute object identity from the doodle + semantic lock.\n"
-        "- Silhouette, proportions, component count, asymmetry, quirks.\n"
-        "- Interior marks stay on parent surfaces; open strokes stay open.\n"
-        "- Delight from volume/material ONLY — never from inventing identity or faces.\n"
+        "- Expression, pose, orientation, major proportions, distinctive features.\n"
+        "- Intentional asymmetry and quirks — not stroke wobble or jagged contours.\n"
+        "Free to change: exact stroke paths, malformed joins, accidental gaps, "
+        "uneven thickness, bad circles, drawing artifacts.\n"
+        "Interior marks stay on parent surfaces; meaningful open strokes stay open "
+        "(clean their execution).\n"
+        "Delight from reconstruction + volume/material — never from inventing identity "
+        "or unsupported faces.\n"
         "\n"
         f"Style separation: this output must read unmistakably as {style.upper()} — "
-        "not the other three styles.\n"
+        "not the other three styles. Apply style aggressively after reconstruction.\n"
     )

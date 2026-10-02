@@ -85,9 +85,11 @@ def interior_mark_instruction(style: str) -> str:
 
 def broken_contour_instruction() -> str:
     return (
-        "BROKEN STRUCTURAL CONTOUR rule: when endpoints are close, directions align, "
-        "same contour, and closure is coherent — close and smooth the gap. "
-        "Do not leave finger-draw gaps as intentional openings."
+        "BROKEN STRUCTURAL CONTOUR rule: repair and reconstruct broken joins. "
+        "When endpoints are close, directions align, same contour, and closure is "
+        "coherent — close and smooth the gap into clean geometry. "
+        "Do not leave finger-draw gaps or jagged joins as intentional openings, "
+        "and do not merely inflate the broken stroke as-is."
     )
 
 

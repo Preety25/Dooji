@@ -1,8 +1,10 @@
 # Changelog — Stylization Spec v1.1
 
+> **Superseded:** Current product behavior is **v1.2 Intent-Preserving Stylized Reconstruction** — see [`../spec-v1.2/CHANGELOG-v1.2.md`](../spec-v1.2/CHANGELOG-v1.2.md) and [`../spec-v1.2/DOOJI-TRANSFORMAT-SPEC.md`](../spec-v1.2/DOOJI-TRANSFORMAT-SPEC.md). This changelog remains the v1.0 → v1.1 historical record.
+
 **Date:** 2026-09-23  
 **Scope:** Spec / art-direction update only. No Blender lab, recipe JSON, AI build, or implementation code changes.  
-**Archived v1.0:** [`archive/v1.0/`](./archive/v1.0/)
+**Archived v1.0:** archive/v1.0 (not in repo)
 
 Updated documents:
 

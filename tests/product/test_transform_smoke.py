@@ -74,12 +74,19 @@ def test_prompt_compiler_doctrine() -> None:
     rec = default_recognition(client_doodle_id="u07")
     prompt = compile_prompt(style=style, recognition=rec, multi_image=True, n_style_refs=1)
     assert "SPECIAL (u07)" not in prompt
-    assert "POLISH THE USER'S DOODLE" in prompt
-    assert "Improve the execution, preserve the idea" in prompt
+    assert "RECONSTRUCT AND STYLIZE THE USER'S DOODLE" in prompt
+    assert "Preserve the decisions, not the mistakes" in prompt
     assert "GUMMY" in prompt.upper()
     assert EXECUTION_DOCTRINE.split("\n", 1)[0] in prompt
+    assert "rough design sketch" in prompt.lower()
+    assert "generic canonical" in prompt.lower()
     # Must not invent faces by default
     assert "no eyes" in prompt.lower() or "HARD BAN" in prompt
+    # Must not over-constrain exact stroke tracing
+    assert "exact stroke" in prompt.lower() or "not pixel" in prompt.lower()
+    assert "Creative anchors to preserve" in prompt
+    assert "Hard preserve:\n- Absolute object identity" not in prompt
+    assert "Keep the silhouette, major part count" not in prompt
 
 
 def test_transform_mock_with_raster_and_strokes() -> None:
@@ -115,8 +122,10 @@ def test_transform_mock_with_raster_and_strokes() -> None:
     raw = base64.b64decode(result.image_base64)
     assert raw[:8] == b"\x89PNG\r\n\x1a\n"
     blob = str(result.to_dict())
-    assert "POLISH THE USER" not in blob
+    assert "RECONSTRUCT AND STYLIZE" not in blob
+    assert "Preserve the decisions" not in blob
     assert "Improve the execution" not in blob
+    assert "POLISH THE USER" not in blob
 
 
 def test_transform_mock_explicit_dry_run_status() -> None:

@@ -1,7 +1,10 @@
 # Transform Principles — Doodle Emoji
 
+> **Superseded for current product behavior by [../spec-v1.2/TRANSFORMAT-PRINCIPLES.md](../spec-v1.2/TRANSFORMAT-PRINCIPLES.md) and the binding [../spec-v1.2/DOOJI-TRANSFORMAT-SPEC.md](../spec-v1.2/DOOJI-TRANSFORMAT-SPEC.md). Keep this file as the v1.1 historical record.
+
+
 **Version:** 1.1 (2026-09-23)  
-**Previous:** 1.0 archived at [`archive/v1.0/TRANSFORMATION-PRINCIPLES.md`](./archive/v1.0/TRANSFORMATION-PRINCIPLES.md)  
+**Previous:** 1.0 archived at archive/v1.0 (not in repo)  
 **Document role:** Art-direction and product rules for how a user doodle becomes a polished render.  
 **Status:** Visual source companion (principles layer) — primary home for Recognition-Assisted Polish  
 **Canonical companions:**
@@ -313,7 +316,7 @@ Full rubric: [`STYLIZATION-SPEC.md`](./STYLIZATION-SPEC.md) §9.
 | Pipeline, engine defaults, full rubric, versioning | [`STYLIZATION-SPEC.md`](./STYLIZATION-SPEC.md) |
 | Material/geometry/lighting recipes; style≠semantics | [`STYLE-RECIPES.md`](./STYLE-RECIPES.md) |
 | v1.1 change summary | [`CHANGELOG-v1.1.md`](./CHANGELOG-v1.1.md) |
-| Product promise / moat framing | [`refs/Product_v2.md`](./refs/Product_v2.md) |
+| Product promise / moat framing | [`../Product_v2.md`](../Product_v2.md) |
 
 ---
 

@@ -1,23 +1,32 @@
 {
   "id": "plush",
-  "version": "1.0.0",
+  "version": "1.1.0",
   "display_name": "Plush",
-  "description": "Stuffed short-pile soft-toy sticker — cozy fabric nap, soft compression.",
+  "description": "Stylized soft stuffed designer toy — short felted pile, puffy volume, collectible soft-sculpture (not photoreal fur).",
   "sheet": "product/assets/style_sheets/sheet_plush.png",
   "sheet_fallbacks": [
     "docs/refs/style_sheets/sheet_plush.png"
   ],
-  "visual_language": "stuffed short-pile soft-toy sticker; cozy fabric presence",
-  "form_language": "stuffed compression; cozy soft-toy silhouette with fuzzy fringe",
-  "material_language": "short-pile stuffed fabric; visible nap/fuzz; subtle seams only if natural",
-  "lighting_language": "soft fabric roll-off; no hard speculars",
+  "visual_language": "stylized soft stuffed designer toy / short-pile felted soft sculpture sticker",
+  "form_language": "simplified puffy stuffed volume; soft compression; clean collectible silhouette",
+  "material_language": "short controlled soft-pile / felted fabric suggestion; subtle tactile nap — never photoreal animal fur",
+  "lighting_language": "soft matte fabric roll-off; cozy diffuse toy lighting — no photographic drama",
   "forbidden": [
+    "photoreal animal fur",
+    "long individual hairs",
+    "extreme fiber / follicle detail",
+    "photographic lighting",
+    "product photo / macro photography",
+    "thick crayon / decal outline ring",
+    "white rectangular backdrop",
+    "ground plane or cast-shadow scene",
     "smooth clay",
     "glossy plastic",
     "translucent jelly",
     "hard vinyl"
   ],
   "prompt_fragments": {
-    "look": "PLUSH material ONLY: stuffed fuzzy short-pile soft toy; visible nap/fuzz; soft compression; cozy fabric. NOT smooth clay, NOT glossy plastic, NOT translucent jelly."
+    "look": "PLUSH material ONLY: stylized soft stuffed designer toy / short-pile felted soft sculpture; simplified puffy volume; subtle controlled fabric nap (short, soft, toy-like); soft compression; matte cozy lighting. NOT photoreal fur, NOT long individual hairs, NOT extreme fiber detail, NOT animal photography, NOT product photo, NOT smooth clay, NOT glossy plastic, NOT translucent jelly.",
+    "hard_rule": "PLUSH HARD RULE (non-negotiable):\nReconstruct as a soft stuffed designer-toy object with filled puffy volume.\nAbsorb doodle stroke/outline colors into the fabric surface — do NOT keep a thick crayon, marker, or decal ring outline wrapped around the object.\nShort controlled soft-pile / felted texture ONLY — suggestion of fabric, not photographic fur.\nTRUE transparent cutout (alpha). NEVER white/gray rectangular backdrop, ground plane, cast-shadow scene, or studio paper."
   }
 }

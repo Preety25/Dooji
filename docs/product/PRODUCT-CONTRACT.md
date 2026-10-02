@@ -6,16 +6,16 @@ Dooji turns a messy doodle into a delightful, shareable stylized sticker **witho
 
 Core product thesis:
 
-> Draw something messy. We will make it look good without making it stop feeling like yours.
+> Draw something messy. Dooji understands what you meant, cleans it up, and makes it beautiful.
 
-Underlying principles:
+Underlying principles (see [`docs/spec-v1.2/DOOJI-TRANSFORMAT-SPEC.md`](../spec-v1.2/DOOJI-TRANSFORMAT-SPEC.md)):
 
-- Improve the execution.
-- Preserve the idea.
-- Preserve authorship.
+- Preserve the decisions, not the mistakes.
+- Improve drawing execution aggressively; reconstruct geometry when needed.
+- Preserve creative intent (identity, expression, pose, orientation, distinctive features).
 - Prefer stylized dimensionality over realism.
-- The doodle determines **what** the object is.
-- The style determines **how** it becomes beautiful.
+- The doodle determines **what** the object is (semantic intent).
+- The style determines **how** it becomes beautiful (after reconstruction).
 
 Core moat:
 
@@ -385,22 +385,26 @@ It:
 
 ## 15. Authorship / Transformation Principles
 
-The transformation should preserve:
+Binding contract: [`docs/spec-v1.2/DOOJI-TRANSFORMAT-SPEC.md`](../spec-v1.2/DOOJI-TRANSFORMAT-SPEC.md) — **Intent-Preserving Stylized Reconstruction**.
 
-- the user’s underlying idea
-- recognizable object identity
-- meaningful composition / proportions
-- recognizable distinctive doodle traits where possible
+The transformation should preserve **creative anchors**:
+
+- the user’s underlying idea / subject identity
+- expression, pose, and orientation
+- meaningful composition / major proportions
+- distinctive features and intentional quirks
 - the feeling that the result originated from the user’s doodle
 
-The goal is **not** to replace the doodle with a completely unrelated polished object.
+The transformation should **aggressively improve** drawing execution (wobble, jagged contours, bad joins, gaps, uneven thickness). Similarity is semantic and expressive — not stroke-level. Do not merely inflate rough strokes.
+
+The goal is **not** to replace the doodle with a completely unrelated polished / stock object.
 
 ---
 
 ## 16. Product Principles
 
-- Preserve the idea.
-- Improve the execution.
+- Preserve the decisions, not the mistakes.
+- Improve the execution (reconstruct; don’t just trace).
 - Make AI feel magical without making the interface feel like an AI dashboard.
 - Keep the experience playful but premium.
 - Favor clarity over feature density.
