@@ -7,13 +7,17 @@ from __future__ import annotations
 
 import base64
 import json
+import time
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from typing import Any
 from urllib.parse import urlparse
 
+from product.api.health import build_health_payload
 from product.policy import get_generation_policy
+from product.policy.exceptions import PolicyStoreUnavailable, QuotaExceeded
 from product.policy.generation_policy import (
     dev_tools_enabled,
+    policy_backend_name,
     reset_dev_quota,
 )
 from product.providers import get_provider
@@ -104,6 +108,35 @@ def parse_transform_body(payload: dict[str, Any]) -> TransformRequest:
     )
 
 
+def _rate_limited_body(style: str, decision) -> dict[str, Any]:
+    return {
+        "status": "rate_limited",
+        "style": style,
+        "transform_version": "product.mvp.v1",
+        "error": decision.reason,
+        "metadata": {
+            "reason": decision.reason,
+            "remaining": decision.remaining,
+            "reset_at": decision.reset_at,
+            "message": decision.message
+            or "You've reached your generation limit for now. Try again later.",
+        },
+    }
+
+
+def _policy_unavailable_body(style: str) -> dict[str, Any]:
+    return {
+        "status": "error",
+        "style": style,
+        "transform_version": "product.mvp.v1",
+        "error": "policy_store_unavailable",
+        "metadata": {
+            "reason": "policy_store_unavailable",
+            "message": "Generations are temporarily unavailable. Please try again later.",
+        },
+    }
+
+
 def handle_transform(
     payload: dict[str, Any],
     *,
@@ -117,6 +150,7 @@ def handle_transform(
     Flow: parse → kill switch → GenerationPolicy → provider → response.
     Cache hits never reach this handler from a well-behaved client.
     """
+    started = time.monotonic()
     req = parse_transform_body(payload)
     anon_id = (
         client_id
@@ -129,6 +163,10 @@ def handle_transform(
 
     # Emergency kill switch — before quota accounting / provider.
     if generations_disabled() and not req.options.dry_run:
+        print(
+            f"transform outcome=generations_disabled style={req.style!r} "
+            f"latency_ms={int((time.monotonic() - started) * 1000)}"
+        )
         return {
             "status": "error",
             "style": req.style,
@@ -142,21 +180,21 @@ def handle_transform(
 
     # dry_run skips quota — local/dev only (rejected in production above).
     if not req.options.dry_run:
-        decision = pol.check(client_id=str(anon_id), ip=ip)
+        try:
+            decision = pol.check(client_id=str(anon_id), ip=ip)
+        except PolicyStoreUnavailable:
+            print(
+                f"transform outcome=policy_store_unavailable style={req.style!r} "
+                f"latency_ms={int((time.monotonic() - started) * 1000)}"
+            )
+            return _policy_unavailable_body(req.style)
         if not decision.allowed:
-            return {
-                "status": "rate_limited",
-                "style": req.style,
-                "transform_version": "product.mvp.v1",
-                "error": decision.reason,
-                "metadata": {
-                    "reason": decision.reason,
-                    "remaining": decision.remaining,
-                    "reset_at": decision.reset_at,
-                    "message": decision.message
-                    or "You've reached your generation limit for now. Try again later.",
-                },
-            }
+            print(
+                f"transform outcome=quota_denied reason={decision.reason} "
+                f"style={req.style!r} "
+                f"latency_ms={int((time.monotonic() - started) * 1000)}"
+            )
+            return _rate_limited_body(req.style, decision)
 
     if req.options.dry_run:
         provider = get_provider("mock")
@@ -166,24 +204,47 @@ def handle_transform(
         provider = get_provider(None)
 
     if not req.options.dry_run:
-        pol.record_provider_attempt(
-            client_id=str(anon_id), ip=ip, style=req.style
-        )
+        try:
+            pol.record_provider_attempt(
+                client_id=str(anon_id), ip=ip, style=req.style
+            )
+        except QuotaExceeded as exc:
+            print(
+                f"transform outcome=quota_denied reason={exc.decision.reason} "
+                f"style={req.style!r} race=1 "
+                f"latency_ms={int((time.monotonic() - started) * 1000)}"
+            )
+            return _rate_limited_body(req.style, exc.decision)
+        except PolicyStoreUnavailable:
+            print(
+                f"transform outcome=policy_store_unavailable style={req.style!r} "
+                f"latency_ms={int((time.monotonic() - started) * 1000)}"
+            )
+            return _policy_unavailable_body(req.style)
 
     result = TransformService(provider=provider).transform(req)
     body = result.to_dict(include_image_base64=True)
 
     if not req.options.dry_run:
-        if body.get("status") in ("ok", "dry_run"):
-            pol.record_success(client_id=str(anon_id), ip=ip, style=req.style)
-        else:
-            pol.record_failure(
-                client_id=str(anon_id),
-                ip=ip,
-                style=req.style,
-                error=str(body.get("error") or "provider_failure"),
-            )
+        try:
+            if body.get("status") in ("ok", "dry_run"):
+                pol.record_success(client_id=str(anon_id), ip=ip, style=req.style)
+            else:
+                pol.record_failure(
+                    client_id=str(anon_id),
+                    ip=ip,
+                    style=req.style,
+                    error=str(body.get("error") or "provider_failure"),
+                )
+        except PolicyStoreUnavailable:
+            # Quota already consumed; surface provider result, log store issue.
+            print("transform audit_write=policy_store_unavailable")
 
+    latency_ms = int((time.monotonic() - started) * 1000)
+    print(
+        f"transform outcome={body.get('status')} provider_error={body.get('error')!r} "
+        f"style={req.style!r} latency_ms={latency_ms}"
+    )
     return body
 
 
@@ -228,7 +289,8 @@ class TransformHandler(BaseHTTPRequestHandler):
     def do_GET(self) -> None:  # noqa: N802
         path = urlparse(self.path).path
         if path in ("/health", "/v1/health"):
-            self._send(200, {"status": "ok", "service": "dooji-transform"})
+            code, body = build_health_payload()
+            self._send(code, body)
             return
         self._send(404, {"error": "not_found"})
 
@@ -292,7 +354,7 @@ class TransformHandler(BaseHTTPRequestHandler):
                 code = 200
             elif status == "rate_limited":
                 code = 429
-            elif body.get("error") == "generations_disabled":
+            elif body.get("error") in ("generations_disabled", "policy_store_unavailable"):
                 code = 503
             else:
                 code = 502
@@ -308,6 +370,20 @@ class TransformHandler(BaseHTTPRequestHandler):
             self._send(500, {"status": "error", "error": f"{type(exc).__name__}"})
 
 
+def validate_production_startup() -> None:
+    """Fail closed before accepting traffic when production config is invalid."""
+    if not is_production():
+        return
+    # Provider factory already fails closed; invoke once at boot.
+    get_provider(None)
+    pol = get_generation_policy()
+    ready = getattr(pol, "ensure_ready", None)
+    if callable(ready):
+        ready()
+    elif policy_backend_name(pol) != "postgres":
+        raise RuntimeError("production requires PostgresGenerationPolicy")
+
+
 def serve(host: str | None = None, port: int | None = None) -> None:
     """Serve the transform stub.
 
@@ -317,17 +393,22 @@ def serve(host: str | None = None, port: int | None = None) -> None:
     """
     host = host if host is not None else resolve_bind_host()
     port = port if port is not None else resolve_bind_port()
+    validate_production_startup()
     httpd = ThreadingHTTPServer((host, port), TransformHandler)
     tools = "ON" if dev_tools_enabled() and not is_production() else "off"
     env = "production" if is_production() else "development"
+    backend = policy_backend_name()
     print(
         f"Dooji transform listening on http://{host}:{port}  "
-        f"(POST /v1/transform; env={env}; DOOJI_DEV_TOOLS={tools})"
+        f"(POST /v1/transform; env={env}; policy={backend}; DOOJI_DEV_TOOLS={tools})"
     )
+    print(f"  health: GET /health  readiness={'db' if env == 'production' else 'process'}")
     if tools == "ON":
         print("  DEV: POST /v1/dev/reset-quota  (local quota reset)")
     if generations_disabled():
         print("  KILL SWITCH: DOOJI_GENERATIONS_DISABLED is active")
+    # Image storage: ephemeral in-memory only (xAI → base64 → mobile Library). No object store.
+    print("  images: ephemeral response bytes only (no object storage)")
     httpd.serve_forever()
 
 

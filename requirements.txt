@@ -1,0 +1,2 @@
+# Render / hosted install entrypoint (see render.yaml buildCommand).
+-r requirements-product.txt

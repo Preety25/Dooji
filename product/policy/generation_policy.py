@@ -4,6 +4,7 @@ Cache hits never reach this layer. Only provider-bound cache misses do.
 
 Local/dev: InMemoryGenerationPolicy (process memory).
 Default production-shaped local: FileGenerationPolicy (durable shared file).
+Production: PostgresGenerationPolicy (DOOJI_POLICY=postgres + DATABASE_URL).
 Swap implementations without changing Canvas / Preview / Result / Library.
 """
 from __future__ import annotations
@@ -15,6 +16,9 @@ import time
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any, Literal, Protocol
+
+from product.policy.exceptions import QuotaExceeded
+from product.runtime import is_production
 
 
 WINDOW_SECONDS = 24 * 60 * 60
@@ -157,62 +161,80 @@ class InMemoryGenerationPolicy:
     def check(self, *, client_id: str, ip: str | None = None) -> PolicyDecision:
         now = time.time()
         with self._lock:
-            client_ts = _prune(self._client_attempts.get(client_id, []), now, self.window)
-            global_ts = _prune(self._global_attempts, now, self.window)
             ip_ts = (
                 _prune(self._ip_attempts.get(ip, []), now, self.window) if ip else []
             )
+            decision = self._check_unlocked(client_id=client_id, ip=ip, now=now)
+            if not decision.allowed:
+                if decision.reason == "global_budget_blocked":
+                    self._audit.append(
+                        AuditEvent(
+                            kind="global_budget_blocked",
+                            client_id=client_id,
+                            ip=ip,
+                        )
+                    )
+                elif ip and len(ip_ts) >= self.ip_burst_limit:
+                    self._audit.append(
+                        AuditEvent(
+                            kind="rate_limited",
+                            client_id=client_id,
+                            ip=ip,
+                            detail={"scope": "ip"},
+                        )
+                    )
+                else:
+                    self._audit.append(
+                        AuditEvent(kind="rate_limited", client_id=client_id, ip=ip)
+                    )
+            return decision
 
-            if len(global_ts) >= self.global_daily:
-                reset_at = min(global_ts) + self.window if global_ts else now + self.window
-                self._audit.append(
-                    AuditEvent(kind="global_budget_blocked", client_id=client_id, ip=ip)
-                )
-                return PolicyDecision(
-                    allowed=False,
-                    reason="global_budget_blocked",
-                    remaining=0,
-                    reset_at=reset_at,
-                    message="You've reached your generation limit for now. Try again later.",
-                )
+    def _check_unlocked(
+        self, *, client_id: str, ip: str | None, now: float
+    ) -> PolicyDecision:
+        client_ts = _prune(self._client_attempts.get(client_id, []), now, self.window)
+        global_ts = _prune(self._global_attempts, now, self.window)
+        ip_ts = _prune(self._ip_attempts.get(ip, []), now, self.window) if ip else []
 
-            if ip and len(ip_ts) >= self.ip_burst_limit:
-                reset_at = min(ip_ts) + self.window
-                self._audit.append(
-                    AuditEvent(kind="rate_limited", client_id=client_id, ip=ip, detail={"scope": "ip"})
-                )
-                return PolicyDecision(
-                    allowed=False,
-                    reason="rate_limited",
-                    remaining=0,
-                    reset_at=reset_at,
-                    message="You've reached your generation limit for now. Try again later.",
-                )
-
-            used = len(client_ts)
-            remaining = max(0, self.anon_limit - used)
-            if used >= self.anon_limit:
-                reset_at = min(client_ts) + self.window if client_ts else now + self.window
-                self._audit.append(
-                    AuditEvent(kind="rate_limited", client_id=client_id, ip=ip)
-                )
-                return PolicyDecision(
-                    allowed=False,
-                    reason="rate_limited",
-                    remaining=0,
-                    reset_at=reset_at,
-                    message="You've reached your generation limit for now. Try again later.",
-                )
-
-            reset_at = (
-                min(client_ts) + self.window if client_ts else now + self.window
-            )
+        if len(global_ts) >= self.global_daily:
+            reset_at = min(global_ts) + self.window if global_ts else now + self.window
             return PolicyDecision(
-                allowed=True,
-                reason="ok",
-                remaining=remaining,
+                allowed=False,
+                reason="global_budget_blocked",
+                remaining=0,
                 reset_at=reset_at,
+                message="You've reached your generation limit for now. Try again later.",
             )
+
+        if ip and len(ip_ts) >= self.ip_burst_limit:
+            reset_at = min(ip_ts) + self.window
+            return PolicyDecision(
+                allowed=False,
+                reason="rate_limited",
+                remaining=0,
+                reset_at=reset_at,
+                message="You've reached your generation limit for now. Try again later.",
+            )
+
+        used = len(client_ts)
+        remaining = max(0, self.anon_limit - used)
+        if used >= self.anon_limit:
+            reset_at = min(client_ts) + self.window if client_ts else now + self.window
+            return PolicyDecision(
+                allowed=False,
+                reason="rate_limited",
+                remaining=0,
+                reset_at=reset_at,
+                message="You've reached your generation limit for now. Try again later.",
+            )
+
+        reset_at = min(client_ts) + self.window if client_ts else now + self.window
+        return PolicyDecision(
+            allowed=True,
+            reason="ok",
+            remaining=remaining,
+            reset_at=reset_at,
+        )
 
     def record_provider_attempt(
         self,
@@ -223,6 +245,11 @@ class InMemoryGenerationPolicy:
     ) -> None:
         now = time.time()
         with self._lock:
+            # Re-check under the same lock so concurrent reserves cannot overspend.
+            decision = self._check_unlocked(client_id=client_id, ip=ip, now=now)
+            if not decision.allowed:
+                raise QuotaExceeded(decision)
+
             self._client_attempts.setdefault(client_id, []).append(now)
             self._client_attempts[client_id] = _prune(
                 self._client_attempts[client_id], now, self.window
@@ -438,17 +465,64 @@ _policy_lock = threading.Lock()
 
 
 def get_generation_policy() -> GenerationPolicy:
-    """Factory — DOOJI_POLICY=memory|file (default file for durable local)."""
+    """Factory — DOOJI_POLICY=memory|file|postgres.
+
+    Development default: file (durable local).
+    Production: postgres required (no silent memory/file fallback).
+    """
     global _policy_singleton
     with _policy_lock:
         if _policy_singleton is not None:
             return _policy_singleton
-        mode = (os.environ.get("DOOJI_POLICY") or "file").lower().strip()
+
+        mode = (os.environ.get("DOOJI_POLICY") or "").lower().strip()
+        if is_production():
+            if not mode:
+                mode = "postgres"
+            if mode in ("memory", "file"):
+                raise RuntimeError(
+                    "DOOJI_POLICY=memory|file is not allowed when DOOJI_ENV=production; "
+                    "use DOOJI_POLICY=postgres with DATABASE_URL"
+                )
+            if mode != "postgres":
+                raise RuntimeError(
+                    f"unknown DOOJI_POLICY={mode!r}; production requires postgres"
+                )
+        else:
+            if not mode:
+                mode = "file"
+
         if mode == "memory":
             _policy_singleton = InMemoryGenerationPolicy()
-        else:
+        elif mode == "file":
             _policy_singleton = FileGenerationPolicy()
+        elif mode == "postgres":
+            from product.policy.postgres_policy import PostgresGenerationPolicy
+
+            _policy_singleton = PostgresGenerationPolicy()
+        else:
+            raise RuntimeError(
+                f"unknown DOOJI_POLICY={mode!r}; expected memory|file|postgres"
+            )
         return _policy_singleton
+
+
+def policy_backend_name(policy: GenerationPolicy | None = None) -> str:
+    """Safe label for logs/health — never includes connection secrets."""
+    pol = policy if policy is not None else _policy_singleton
+    if pol is not None:
+        name = type(pol).__name__
+        if name == "PostgresGenerationPolicy":
+            return "postgres"
+        if name == "FileGenerationPolicy":
+            return "file"
+        if name == "InMemoryGenerationPolicy":
+            return "memory"
+        return name
+    mode = (os.environ.get("DOOJI_POLICY") or "").lower().strip()
+    if is_production() and not mode:
+        return "postgres"
+    return mode or "file"
 
 
 def reset_generation_policy_for_tests(policy: GenerationPolicy | None = None) -> None:

@@ -1,3 +1,6 @@
 # Production MVP foundation (product/)
 # Pillow optional but recommended for postprocess + stroke rasterization
 Pillow>=10.0.0
+
+# Postgres generation-policy backend (DOOJI_POLICY=postgres)
+psycopg[binary]>=3.1.0
