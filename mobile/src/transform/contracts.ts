@@ -41,10 +41,12 @@ export interface TransformRequest {
   /** Canonical stroke JSON (source of truth for edit/retry; complements PNG). */
   strokes?: StrokeJson;
   client_doodle_id?: string;
+  /** Persistent anonymous client id — quota identity (server-authoritative). */
+  anonymous_client_id?: string;
   options?: TransformOptions;
 }
 
-export type TransformStatus = 'ok' | 'error' | 'dry_run';
+export type TransformStatus = 'ok' | 'error' | 'dry_run' | 'rate_limited';
 
 export interface TransformResult {
   status: TransformStatus;

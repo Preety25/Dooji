@@ -8,6 +8,7 @@ import {
   type TransformResult,
 } from './contracts';
 import { mockAssetModule } from './mockAssets';
+import { transformDebug } from '../lib/transformDebug';
 
 /**
  * Local mock transform — never calls network image APIs.
@@ -18,6 +19,11 @@ export class MockTransformClient implements TransformClient {
 
   async transform(request: TransformRequest): Promise<TransformResult> {
     const style = (request.style || 'gummy') as StyleId;
+    transformDebug('mock-transform-start', {
+      style,
+      hasRaster: Boolean(request.doodle_base64),
+      strokeCount: request.strokes?.strokes?.length ?? 0,
+    });
     // Light playful latency — not a fake long progress bar.
     await delay(450 + Math.random() * 350);
 
@@ -41,6 +47,11 @@ export class MockTransformClient implements TransformClient {
       if (!uri) {
         throw new Error('mock asset missing');
       }
+      transformDebug('mock-result-returned', {
+        status: 'ok',
+        style,
+        image_url: uri.slice(0, 80),
+      });
       return {
         status: 'ok',
         style,
@@ -57,6 +68,9 @@ export class MockTransformClient implements TransformClient {
         },
       };
     } catch (err) {
+      transformDebug('mock-result-error', {
+        error: err instanceof Error ? err.message : 'mock_failed',
+      });
       return {
         status: 'error',
         style,

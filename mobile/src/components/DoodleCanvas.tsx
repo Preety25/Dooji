@@ -4,7 +4,7 @@ import { Gesture, GestureDetector } from 'react-native-gesture-handler';
 import Svg, { Path } from 'react-native-svg';
 import { runOnJS } from 'react-native-reanimated';
 
-import { colors } from '../design/tokens';
+import { colors as fallbackColors } from '../design/tokens';
 import { newId } from '../lib/id';
 import { strokesToSvgPath } from '../lib/strokes';
 import type { DoodleStroke } from '../models/types';
@@ -14,7 +14,11 @@ interface Props {
   color: string;
   size: number;
   tool: 'brush' | 'eraser';
+  /** Canvas surface used for eraser “paint” and background. */
+  surfaceColor?: string;
   onStrokeEnd: (stroke: DoodleStroke) => void;
+  /** Fires on pointer/touch-down — before the stroke is committed. */
+  onStrokeStart?: () => void;
   onLayoutSize?: (size: { width: number; height: number }) => void;
   enabled?: boolean;
 }
@@ -24,7 +28,9 @@ export function DoodleCanvas({
   color,
   size,
   tool,
+  surfaceColor = fallbackColors.canvas,
   onStrokeEnd,
+  onStrokeStart,
   onLayoutSize,
   enabled = true,
 }: Props) {
@@ -34,23 +40,25 @@ export function DoodleCanvas({
 
   const onLayout = (e: LayoutChangeEvent) => {
     const { width, height } = e.nativeEvent.layout;
+    if (!(width > 0 && height > 0)) return;
     setSizeBox({ width, height });
     onLayoutSize?.({ width, height });
   };
 
   const begin = useCallback(
     (x: number, y: number) => {
+      onStrokeStart?.();
       const stroke: DoodleStroke = {
         id: newId('stroke'),
         points: [{ x, y }],
-        color: tool === 'eraser' ? colors.canvas : color,
+        color: tool === 'eraser' ? surfaceColor : color,
         width: tool === 'eraser' ? size * 2.2 : size,
         tool,
       };
       liveRef.current = stroke;
       setLive(stroke);
     },
-    [color, size, tool],
+    [color, size, tool, surfaceColor, onStrokeStart],
   );
 
   const move = useCallback((x: number, y: number) => {
@@ -84,7 +92,7 @@ export function DoodleCanvas({
   const all = live ? [...strokes, live] : strokes;
 
   return (
-    <View style={styles.wrap} onLayout={onLayout}>
+    <View style={[styles.wrap, { backgroundColor: surfaceColor }]} onLayout={onLayout}>
       <GestureDetector gesture={pan}>
         <View style={styles.canvas} collapsable={false}>
           <Svg width={sizeBox.width} height={sizeBox.height}>
@@ -97,7 +105,6 @@ export function DoodleCanvas({
                 strokeLinecap="round"
                 strokeLinejoin="round"
                 fill="none"
-                opacity={s.tool === 'eraser' ? 1 : 1}
               />
             ))}
           </Svg>
@@ -110,7 +117,6 @@ export function DoodleCanvas({
 const styles = StyleSheet.create({
   wrap: {
     flex: 1,
-    backgroundColor: colors.canvas,
     borderRadius: 0,
     overflow: 'hidden',
   },

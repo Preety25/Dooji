@@ -1,12 +1,21 @@
 import React from 'react';
-import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { Pressable, StyleSheet, Text, View } from 'react-native';
 import Animated, {
   useAnimatedStyle,
   useSharedValue,
   withSpring,
 } from 'react-native-reanimated';
+import { MaterialCommunityIcons, MaterialIcons } from '@expo/vector-icons';
 
-import { colors, motion, radius, spacing, type } from '../design/tokens';
+import { useTheme } from '../design/theme';
+import {
+  brushSizes,
+  brushSwatchShadow,
+  motion,
+  radius,
+  spacing,
+  type,
+} from '../design/tokens';
 
 const AnimatedPressable = Animated.createAnimatedComponent(Pressable);
 
@@ -27,151 +36,332 @@ interface Props {
   onMakeIt: () => void;
 }
 
-function ToolChip({
-  label,
-  active,
-  onPress,
-  disabled,
-}: {
-  label: string;
-  active?: boolean;
-  onPress: () => void;
-  disabled?: boolean;
-}) {
-  const scale = useSharedValue(1);
-  const anim = useAnimatedStyle(() => ({ transform: [{ scale: scale.value }] }));
-  return (
-    <AnimatedPressable
-      disabled={disabled}
-      onPress={onPress}
-      onPressIn={() => {
-        scale.value = withSpring(0.94, motion.press);
-      }}
-      onPressOut={() => {
-        scale.value = withSpring(1, motion.press);
-      }}
-      style={[
-        styles.chip,
-        active && styles.chipActive,
-        disabled && { opacity: 0.35 },
-        anim,
-      ]}
-    >
-      <Text style={[styles.chipText, active && styles.chipTextActive]}>{label}</Text>
-    </AnimatedPressable>
-  );
-}
+const DOT = [8, 12, 16];
 
 export function CanvasToolbar(props: Props) {
+  const { colors } = useTheme();
+  const makeActive = props.hasStrokes;
+
   return (
-    <View style={styles.bar}>
-      <ScrollView
-        horizontal
-        showsHorizontalScrollIndicator={false}
-        contentContainerStyle={styles.row}
+    <View style={styles.wrap}>
+      <View style={styles.palette} accessibilityRole="radiogroup">
+        {props.colors.map((c) => {
+          const active = props.color.toLowerCase() === c.toLowerCase();
+          const light = c.toLowerCase() === '#ffffff';
+          const shadow = active ? brushSwatchShadow(c) : null;
+          return (
+            <Pressable
+              key={c}
+              accessibilityRole="radio"
+              accessibilityState={{ selected: active }}
+              accessibilityLabel={`Color ${c}`}
+              onPress={() => {
+                props.onColor(c);
+                props.onTool('brush');
+              }}
+              style={styles.swatchHit}
+            >
+              <View
+                style={[
+                  styles.swatch,
+                  {
+                    width: active ? 36 : 24,
+                    height: active ? 36 : 24,
+                    borderRadius: 99,
+                    backgroundColor: c,
+                    borderWidth: light ? 1 : 0,
+                    borderColor: colors.border,
+                    ...(shadow || {
+                      shadowOpacity: 0,
+                      elevation: 0,
+                    }),
+                  },
+                ]}
+              />
+            </Pressable>
+          );
+        })}
+      </View>
+
+      <View
+        style={[
+          styles.toolbar,
+          {
+            backgroundColor: colors.toolbarBg,
+            borderColor: colors.toolbarBorder,
+          },
+        ]}
       >
-        <ToolChip label="Undo" onPress={props.onUndo} disabled={!props.canUndo} />
-        <ToolChip label="Redo" onPress={props.onRedo} disabled={!props.canRedo} />
-        <ToolChip
-          label="Brush"
+        <IconBtn
+          name="undo"
+          accessibilityLabel="Undo"
+          disabled={!props.canUndo}
+          color={colors.ink}
+          muted={colors.hint}
+          onPress={props.onUndo}
+        />
+        <IconBtn
+          name="redo"
+          accessibilityLabel="Redo"
+          disabled={!props.canRedo}
+          color={colors.ink}
+          muted={colors.hint}
+          onPress={props.onRedo}
+        />
+        <View style={[styles.divider, { backgroundColor: colors.toolbarDivider }]} />
+        <ToolCircle
           active={props.tool === 'brush'}
           onPress={() => props.onTool('brush')}
+          accessibilityLabel="Pen"
+          activeBg={colors.controlSelectedBg}
+          activeFg={colors.controlSelectedFg}
+          ink={colors.ink}
+          icon="edit"
         />
-        <ToolChip
-          label="Eraser"
+        <ToolCircle
           active={props.tool === 'eraser'}
           onPress={() => props.onTool('eraser')}
+          accessibilityLabel="Eraser"
+          activeBg={colors.controlSelectedBg}
+          activeFg={colors.controlSelectedFg}
+          ink={colors.ink}
+          iconSet="community"
+          icon="eraser"
         />
-        <ToolChip label="Clear" onPress={props.onClear} disabled={!props.hasStrokes} />
-        {[6, 10, 16].map((n) => (
-          <ToolChip
-            key={n}
-            label={`${n}`}
-            active={props.size === n}
-            onPress={() => props.onSize(n)}
-          />
-        ))}
-        {props.colors.map((c) => (
-          <Pressable
-            key={c}
-            onPress={() => props.onColor(c)}
-            style={[
-              styles.swatch,
-              { backgroundColor: c },
-              props.color === c && styles.swatchActive,
-              c === '#FFFFFF' && styles.swatchBorder,
-            ]}
-          />
-        ))}
-      </ScrollView>
+        <View style={styles.sizes} accessibilityRole="radiogroup">
+          {brushSizes.map((n, i) => {
+            const active = props.size === n && props.tool === 'brush';
+            return (
+              <Pressable
+                key={n}
+                accessibilityRole="radio"
+                accessibilityState={{ selected: active }}
+                accessibilityLabel={`Brush size ${n}`}
+                onPress={() => {
+                  props.onSize(n);
+                  props.onTool('brush');
+                }}
+                hitSlop={8}
+                style={styles.sizeHit}
+              >
+                <View
+                  style={{
+                    width: DOT[i],
+                    height: DOT[i],
+                    borderRadius: 99,
+                    backgroundColor: active
+                      ? colors.controlSelectedBg
+                      : colors.hint,
+                  }}
+                />
+              </Pressable>
+            );
+          })}
+        </View>
+        <View style={[styles.divider, { backgroundColor: colors.toolbarDivider }]} />
+        <IconBtn
+          name="delete-outline"
+          accessibilityLabel="Clear canvas"
+          disabled={!props.hasStrokes}
+          color={colors.danger}
+          muted={colors.hint}
+          onPress={props.onClear}
+        />
+      </View>
+
       <Pressable
         accessibilityRole="button"
         accessibilityLabel="Make it"
-        disabled={!props.hasStrokes}
+        disabled={!makeActive}
         onPress={props.onMakeIt}
-        style={[styles.makeIt, !props.hasStrokes && { opacity: 0.4 }]}
+        style={[
+          styles.makeIt,
+          {
+            backgroundColor: makeActive
+              ? colors.makeItActive
+              : colors.makeItMuted,
+          },
+        ]}
       >
-        <Text style={styles.makeItText}>Make it ✨</Text>
+        <Text
+          style={[
+            styles.makeItText,
+            {
+              color: makeActive
+                ? colors.makeItActiveText
+                : colors.makeItMutedText,
+            },
+          ]}
+        >
+          Make it{' '}
+        </Text>
+        <MaterialIcons
+          name="auto-awesome"
+          size={18}
+          color={
+            makeActive ? colors.makeItActiveIcon : colors.makeItMutedText
+          }
+        />
       </Pressable>
     </View>
   );
 }
 
+function IconBtn({
+  name,
+  accessibilityLabel,
+  disabled,
+  color,
+  muted,
+  onPress,
+}: {
+  name: React.ComponentProps<typeof MaterialIcons>['name'];
+  accessibilityLabel: string;
+  disabled?: boolean;
+  color: string;
+  muted: string;
+  onPress: () => void;
+}) {
+  return (
+    <Pressable
+      accessibilityRole="button"
+      accessibilityLabel={accessibilityLabel}
+      disabled={disabled}
+      onPress={onPress}
+      hitSlop={8}
+      style={styles.iconBtn}
+    >
+      <MaterialIcons
+        name={name}
+        size={22}
+        color={disabled ? muted : color}
+        style={{ opacity: disabled ? 0.45 : 1 }}
+      />
+    </Pressable>
+  );
+}
+
+function ToolCircle({
+  active,
+  onPress,
+  accessibilityLabel,
+  activeBg,
+  activeFg,
+  ink,
+  icon,
+  iconSet = 'material',
+}: {
+  active: boolean;
+  onPress: () => void;
+  accessibilityLabel: string;
+  activeBg: string;
+  activeFg: string;
+  ink: string;
+  icon: string;
+  iconSet?: 'material' | 'community';
+}) {
+  const scale = useSharedValue(1);
+  const anim = useAnimatedStyle(() => ({ transform: [{ scale: scale.value }] }));
+  const color = active ? activeFg : ink;
+  return (
+    <AnimatedPressable
+      accessibilityRole="button"
+      accessibilityLabel={accessibilityLabel}
+      accessibilityState={{ selected: active }}
+      onPress={onPress}
+      onPressIn={() => {
+        scale.value = withSpring(0.86, motion.press);
+      }}
+      onPressOut={() => {
+        scale.value = withSpring(1, motion.press);
+      }}
+      style={[
+        styles.toolCircle,
+        { backgroundColor: active ? activeBg : 'transparent' },
+        anim,
+      ]}
+    >
+      {iconSet === 'community' ? (
+        <MaterialCommunityIcons name={icon as 'eraser'} size={20} color={color} />
+      ) : (
+        <MaterialIcons
+          name={icon as React.ComponentProps<typeof MaterialIcons>['name']}
+          size={20}
+          color={color}
+        />
+      )}
+    </AnimatedPressable>
+  );
+}
+
 const styles = StyleSheet.create({
-  bar: {
+  wrap: {
+    paddingHorizontal: spacing.lg,
     paddingTop: spacing.sm,
-    paddingBottom: spacing.sm,
-    paddingHorizontal: spacing.md,
-    gap: spacing.sm,
-    backgroundColor: colors.surface,
-    borderTopWidth: 1,
-    borderTopColor: colors.border,
+    gap: spacing.md,
   },
-  row: {
+  palette: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
     alignItems: 'center',
-    gap: spacing.sm,
-    paddingVertical: spacing.xs,
+    paddingHorizontal: spacing.xs,
   },
-  chip: {
-    minHeight: 40,
-    paddingHorizontal: spacing.md,
-    borderRadius: radius.md,
-    backgroundColor: colors.styleChip,
+  swatchHit: {
+    width: 40,
+    height: 44,
+    alignItems: 'center',
     justifyContent: 'center',
   },
-  chipActive: {
-    backgroundColor: colors.styleChipActive,
-  },
-  chipText: {
-    ...type.caption,
-    color: colors.ink,
-  },
-  chipTextActive: {
-    color: '#FFF',
-  },
-  swatch: {
-    width: 32,
-    height: 32,
-    borderRadius: 16,
-  },
-  swatchActive: {
-    borderWidth: 2,
-    borderColor: colors.accent,
-  },
-  swatchBorder: {
+  swatch: {},
+  toolbar: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    minHeight: spacing.toolbar,
+    paddingHorizontal: spacing.sm,
+    borderRadius: radius.pill,
     borderWidth: 1,
-    borderColor: colors.border,
+  },
+  iconBtn: {
+    width: 44,
+    height: 44,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  divider: {
+    width: 1.5,
+    height: 24,
+    borderRadius: 99,
+    marginHorizontal: 2,
+  },
+  toolCircle: {
+    width: 44,
+    height: 44,
+    borderRadius: 22,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  sizes: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginLeft: 4,
+  },
+  sizeHit: {
+    width: 28,
+    height: 40,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   makeIt: {
-    minHeight: spacing.touch,
-    borderRadius: radius.lg,
-    backgroundColor: colors.accent,
+    minHeight: spacing.makeIt,
+    borderRadius: radius.pill,
     alignItems: 'center',
     justifyContent: 'center',
+    flexDirection: 'row',
+    gap: 6,
   },
   makeItText: {
     ...type.button,
-    color: '#FFF',
-    fontSize: 18,
+    fontSize: 16,
   },
 });

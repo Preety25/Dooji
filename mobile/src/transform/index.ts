@@ -2,6 +2,7 @@ import type { TransformClient } from './client';
 import { resolveTransformMode } from './client';
 import { HttpTransformClient } from './httpClient';
 import { MockTransformClient } from './mockClient';
+import { transformDebug } from '../lib/transformDebug';
 
 let singleton: TransformClient | null = null;
 
@@ -12,9 +13,10 @@ let singleton: TransformClient | null = null;
  */
 export function getTransformClient(): TransformClient {
   if (!singleton) {
-    singleton = resolveTransformMode() === 'http'
-      ? new HttpTransformClient()
-      : new MockTransformClient();
+    const mode = resolveTransformMode();
+    transformDebug('transform-client-init', { mode });
+    singleton =
+      mode === 'http' ? new HttpTransformClient() : new MockTransformClient();
   }
   return singleton;
 }

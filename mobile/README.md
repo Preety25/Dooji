@@ -99,3 +99,46 @@ mobile/
 Primary flow: Open → Canvas → Draw → Make it ✨ → Generating → Result → styles / save / share / edit / try another → Library / New doodle.
 
 Default first style: **Gummy** (no style pick required before first transform).
+
+## Local QA: reset anonymous generation quota (dev only)
+
+Anonymous clients are limited to **6 generations / rolling 24h** (unchanged in production).
+For local Expo Go testing against a running transform API, reset **quota counters only**
+(Library / creations / cache assets are untouched):
+
+1. Start the API with dev tools enabled (required — endpoint 404s otherwise):
+
+```powershell
+# repo root
+$env:DOOJI_DEV_TOOLS = "1"
+$env:DOOJI_HOST = "0.0.0.0"
+$env:DOOJI_PORT = "8080"
+python -m product.api.app
+```
+
+2. Reset all local quota state (recommended for QA):
+
+```powershell
+Invoke-RestMethod -Method POST `
+  -Uri "http://127.0.0.1:8080/v1/dev/reset-quota" `
+  -ContentType "application/json" `
+  -Body '{"all":true}'
+```
+
+Or reset one anonymous client id:
+
+```powershell
+Invoke-RestMethod -Method POST `
+  -Uri "http://127.0.0.1:8080/v1/dev/reset-quota" `
+  -ContentType "application/json" `
+  -Body '{"anonymous_client_id":"YOUR_ANON_ID"}'
+```
+
+Or via helper:
+
+```powershell
+python -m scripts.reset_dev_quota
+# python -m scripts.reset_dev_quota --client YOUR_ANON_ID
+```
+
+`DOOJI_DEV_TOOLS` must stay unset/false in production — `POST /v1/dev/reset-quota` returns 404.

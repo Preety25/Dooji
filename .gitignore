@@ -11,6 +11,7 @@ venv/
 Thumbs.db
 .idea/
 .vscode/
+.cursor/
 *.swp
 
 # Secrets / local env (never commit)

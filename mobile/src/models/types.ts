@@ -60,7 +60,14 @@ export interface GeneratedAsset {
   style: StyleId;
   /** Local file URI or data URI of the generated PNG. */
   imageUri: string;
+  /** Transform pipeline version that produced this asset. */
   transformVersion?: string;
+  /** Style pack version (product/styles/{id}.json). */
+  styleVersion?: string;
+  /** Semantic / prompt-compiler identity pin. */
+  semanticVersion?: string;
+  /** Fingerprint of the doodle strokes+canvas used to generate this asset. */
+  doodleFingerprint?: string;
   provider?: string;
   createdAt: string;
   metadata?: Record<string, unknown>;
@@ -88,6 +95,10 @@ export function latestAsset(creation: Creation): GeneratedAsset | undefined {
   )[0];
 }
 
+/**
+ * Latest asset for a style on this Creation (may be obsolete).
+ * Prefer {@link lookupCachedAsset} from generation/cache for validity-aware reuse.
+ */
 export function assetForStyle(
   creation: Creation,
   style: StyleId,

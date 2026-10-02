@@ -4,11 +4,14 @@ export type AnalyticsEvent =
   | 'app_open'
   | 'canvas_started'
   | 'doodle_completed'
+  | 'preview_viewed'
+  | 'style_selected'
+  | 'surprise_me_selected'
+  | 'create_style_clicked'
+  | 'style_cache_hit'
   | 'transform_started'
   | 'transform_succeeded'
   | 'transform_failed'
-  | 'style_selected'
-  | 'try_another'
   | 'edit_doodle'
   | 'saved'
   | 'shared'
@@ -28,4 +31,8 @@ export function track(event: AnalyticsEvent, props?: AnalyticsProps): void {
 
 export function getAnalyticsBuffer() {
   return [...buffer];
+}
+
+export function clearAnalyticsBuffer(): void {
+  buffer.length = 0;
 }

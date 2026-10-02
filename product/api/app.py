@@ -11,6 +11,11 @@ from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from typing import Any
 from urllib.parse import urlparse
 
+from product.policy import get_generation_policy
+from product.policy.generation_policy import (
+    dev_tools_enabled,
+    reset_dev_quota,
+)
 from product.providers import get_provider
 from product.transform.contracts import TransformOptions, TransformRequest
 from product.transform.service import TransformService
@@ -56,25 +61,96 @@ def handle_transform(
     payload: dict[str, Any],
     *,
     provider_name: str | None = None,
+    client_id: str | None = None,
+    client_ip: str | None = None,
+    policy=None,
 ) -> dict[str, Any]:
-    """Core handler used by HTTP stub and unit tests."""
+    """Core handler used by HTTP stub and unit tests.
+
+    Flow: parse → GenerationPolicy (cache is client-side) → provider → response.
+    Cache hits never reach this handler from a well-behaved client.
+    """
     req = parse_transform_body(payload)
+    anon_id = (
+        client_id
+        or payload.get("anonymous_client_id")
+        or payload.get("client_id")
+        or "anonymous"
+    )
+    ip = client_ip or payload.get("client_ip")
+    pol = policy if policy is not None else get_generation_policy()
+
+    # dry_run skips quota — used for smoke / CI without burning budget
+    if not req.options.dry_run:
+        decision = pol.check(client_id=str(anon_id), ip=ip)
+        if not decision.allowed:
+            return {
+                "status": "rate_limited",
+                "style": req.style,
+                "transform_version": "product.mvp.v1",
+                "error": decision.reason,
+                "metadata": {
+                    "reason": decision.reason,
+                    "remaining": decision.remaining,
+                    "reset_at": decision.reset_at,
+                    "message": decision.message
+                    or "You've reached your generation limit for now. Try again later.",
+                },
+            }
+
     provider = get_provider(provider_name) if provider_name else get_provider(
         "mock" if req.options.dry_run else None
     )
     if req.options.dry_run:
         provider = get_provider("mock")
+
+    if not req.options.dry_run:
+        pol.record_provider_attempt(
+            client_id=str(anon_id), ip=ip, style=req.style
+        )
+
     result = TransformService(provider=provider).transform(req)
-    # Mobile-facing: never include compiled prompt
     body = result.to_dict(include_image_base64=True)
+
+    if not req.options.dry_run:
+        if body.get("status") in ("ok", "dry_run"):
+            pol.record_success(client_id=str(anon_id), ip=ip, style=req.style)
+        else:
+            pol.record_failure(
+                client_id=str(anon_id),
+                ip=ip,
+                style=req.style,
+                error=str(body.get("error") or "provider_failure"),
+            )
+
     return body
+
+
+def handle_dev_reset_quota(payload: dict[str, Any] | None = None) -> dict[str, Any]:
+    """DEV-ONLY: clear GenerationPolicy counters for local QA.
+
+    Requires ``DOOJI_DEV_TOOLS=1``. Does not touch Library / creations / cache assets.
+    """
+    if not dev_tools_enabled():
+        return {"ok": False, "error": "dev_tools_disabled"}
+    body = payload or {}
+    reset_all = bool(body.get("all") or body.get("reset_all"))
+    client_id = body.get("anonymous_client_id") or body.get("client_id") or None
+    if isinstance(client_id, str):
+        client_id = client_id.strip() or None
+    result = reset_dev_quota(client_id=client_id, reset_all=reset_all or not client_id)
+    return {
+        "ok": True,
+        "dev_only": True,
+        "message": "Local generation quota reset. Library data unchanged.",
+        **result,
+    }
 
 
 class TransformHandler(BaseHTTPRequestHandler):
     server_version = "DoojiTransform/0.1"
 
-    def log_message(self, fmt: str, *args) -> None:  # quieter default
-        # Never log Authorization or bodies that might contain keys
+    def log_message(self, fmt: str, *args) -> None:  # noqa: N802
         sys_stderr_write = getattr(self, "_quiet", False)
         if sys_stderr_write:
             return
@@ -97,19 +173,46 @@ class TransformHandler(BaseHTTPRequestHandler):
 
     def do_POST(self) -> None:  # noqa: N802
         path = urlparse(self.path).path
-        if path != "/v1/transform":
-            self._send(404, {"error": "not_found"})
-            return
         length = int(self.headers.get("Content-Length") or 0)
         raw = self.rfile.read(length) if length else b"{}"
         try:
-            payload = json.loads(raw.decode("utf-8"))
+            payload = json.loads(raw.decode("utf-8") or "{}")
         except json.JSONDecodeError:
             self._send(400, {"status": "error", "error": "invalid JSON"})
             return
+
+        # Development-only quota reset — 404 unless DOOJI_DEV_TOOLS=1.
+        if path in ("/v1/dev/reset-quota", "/dev/reset-quota"):
+            if not dev_tools_enabled():
+                self._send(404, {"error": "not_found"})
+                return
+            try:
+                body = handle_dev_reset_quota(
+                    payload if isinstance(payload, dict) else {}
+                )
+                self._send(200, body)
+            except Exception as exc:  # noqa: BLE001
+                self._send(500, {"ok": False, "error": f"{type(exc).__name__}"})
+            return
+
+        if path != "/v1/transform":
+            self._send(404, {"error": "not_found"})
+            return
         try:
-            body = handle_transform(payload)
-            code = 200 if body.get("status") in ("ok", "dry_run") else 502
+            client_id = self.headers.get("X-Dooji-Client-Id") or payload.get(
+                "anonymous_client_id"
+            )
+            client_ip = self.client_address[0] if self.client_address else None
+            body = handle_transform(
+                payload, client_id=client_id, client_ip=client_ip
+            )
+            status = body.get("status")
+            if status in ("ok", "dry_run"):
+                code = 200
+            elif status == "rate_limited":
+                code = 429
+            else:
+                code = 502
             self._send(code, body)
         except ValueError as exc:
             self._send(400, {"status": "error", "error": str(exc)})
@@ -124,7 +227,13 @@ def serve(host: str = "0.0.0.0", port: int = 8080) -> None:
     POST /v1/transform. Override with DOOJI_HOST=127.0.0.1 for localhost-only.
     """
     httpd = ThreadingHTTPServer((host, port), TransformHandler)
-    print(f"Dooji transform listening on http://{host}:{port}  (POST /v1/transform)")
+    tools = "ON" if dev_tools_enabled() else "off"
+    print(
+        f"Dooji transform listening on http://{host}:{port}  "
+        f"(POST /v1/transform; DOOJI_DEV_TOOLS={tools})"
+    )
+    if dev_tools_enabled():
+        print("  DEV: POST /v1/dev/reset-quota  (local quota reset)")
     httpd.serve_forever()
 
 

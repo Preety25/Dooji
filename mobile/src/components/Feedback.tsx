@@ -1,5 +1,5 @@
 import React, { useEffect } from 'react';
-import { Modal, StyleSheet, Text, View } from 'react-native';
+import { Modal, Pressable, StyleSheet, Text, View } from 'react-native';
 import Animated, {
   useAnimatedStyle,
   useSharedValue,
@@ -8,39 +8,137 @@ import Animated, {
   withSpring,
 } from 'react-native-reanimated';
 
-import { colors, motion, radius, spacing, type } from '../design/tokens';
+import { useTheme } from '../design/theme';
+import { motion, radius, spacing, type } from '../design/tokens';
 import { SoftButton } from './SoftButton';
 
 interface Props {
   visible: boolean;
-  dirty: boolean;
+  title?: string;
+  body?: string;
+  primaryLabel?: string;
+  secondaryLabel?: string;
+  cancelLabel?: string;
   onSave: () => void;
   onDiscard: () => void;
   onCancel: () => void;
 }
 
-export function UnsavedDialog({ visible, dirty, onSave, onDiscard, onCancel }: Props) {
+/** Bottom sheet navigation guard — Stay only cancels this leave attempt. */
+export function UnsavedDialog({
+  visible,
+  title,
+  body,
+  primaryLabel = 'Save and leave',
+  secondaryLabel = 'Discard and leave',
+  cancelLabel = 'Stay',
+  onSave,
+  onDiscard,
+  onCancel,
+}: Props) {
+  const { colors } = useTheme();
   if (!visible) return null;
+  const resolvedTitle = title || 'Keep this doodle?';
+  const resolvedBody =
+    body || "It isn't saved yet. Starting something new will clear it.";
   return (
     <Modal transparent animationType="fade" visible={visible} onRequestClose={onCancel}>
-      <View style={styles.backdrop}>
-        <View style={styles.card}>
-          <Text style={styles.title}>
-            {dirty ? 'Save this doodle?' : 'Start fresh?'}
-          </Text>
-          <Text style={styles.body}>
-            {dirty
-              ? 'You have an unsaved creation. Save it to your library, discard it, or cancel.'
-              : 'Ready for a new doodle.'}
-          </Text>
+      <View style={[styles.backdrop, { backgroundColor: colors.overlay }]}>
+        <View style={[styles.sheet, { backgroundColor: colors.surfaceElevated }]}>
+          <Text style={[styles.title, { color: colors.ink }]}>{resolvedTitle}</Text>
+          <Text style={[styles.body, { color: colors.muted }]}>{resolvedBody}</Text>
           <View style={styles.actions}>
-            {dirty && <SoftButton label="Save" onPress={onSave} />}
-            <SoftButton label="Discard" variant="danger" onPress={onDiscard} />
-            <SoftButton label="Cancel" variant="ghost" onPress={onCancel} />
+            <SoftButton label={primaryLabel} variant="ink" onPress={onSave} />
+            <SoftButton
+              label={secondaryLabel}
+              variant="sheetSecondary"
+              onPress={onDiscard}
+            />
+            <Pressable
+              accessibilityRole="button"
+              accessibilityLabel={cancelLabel}
+              onPress={onCancel}
+              style={styles.stayHit}
+            >
+              <Text style={[styles.stay, { color: colors.ink }]}>{cancelLabel}</Text>
+            </Pressable>
           </View>
         </View>
       </View>
     </Modal>
+  );
+}
+
+interface ConfirmProps {
+  visible: boolean;
+  title: string;
+  body: string;
+  confirmLabel?: string;
+  cancelLabel?: string;
+  onConfirm: () => void;
+  onCancel: () => void;
+}
+
+/** Destructive-but-local confirmation (e.g. Discard changes). */
+export function ConfirmSheet({
+  visible,
+  title,
+  body,
+  confirmLabel = 'Discard changes',
+  cancelLabel = 'Cancel',
+  onConfirm,
+  onCancel,
+}: ConfirmProps) {
+  const { colors } = useTheme();
+  if (!visible) return null;
+  return (
+    <Modal transparent animationType="fade" visible={visible} onRequestClose={onCancel}>
+      <View style={[styles.backdrop, { backgroundColor: colors.overlay }]}>
+        <View style={[styles.sheet, { backgroundColor: colors.surfaceElevated }]}>
+          <Text style={[styles.title, { color: colors.ink }]}>{title}</Text>
+          <Text style={[styles.body, { color: colors.muted }]}>{body}</Text>
+          <View style={styles.actions}>
+            <SoftButton label={confirmLabel} variant="danger" onPress={onConfirm} />
+            <SoftButton label={cancelLabel} variant="ghost" onPress={onCancel} />
+          </View>
+        </View>
+      </View>
+    </Modal>
+  );
+}
+
+interface ToastProps {
+  visible: boolean;
+  message: string;
+  actionLabel?: string;
+  onAction?: () => void;
+  onDismiss?: () => void;
+}
+
+/** Lightweight canvas toast — "Canvas cleared. Undo" */
+export function CanvasToast({
+  visible,
+  message,
+  actionLabel,
+  onAction,
+}: ToastProps) {
+  const { colors } = useTheme();
+  if (!visible) return null;
+  return (
+    <View
+      pointerEvents="box-none"
+      style={styles.toastWrap}
+      accessibilityLiveRegion="polite"
+    >
+      <View style={[styles.toast, { backgroundColor: colors.toastBg }]}>
+        <Text style={[styles.toastText, { color: colors.toastText }]}>{message}</Text>
+        {actionLabel && onAction ? (
+          <Pressable onPress={onAction} accessibilityRole="button">
+            <Text style={[styles.toastAction, { color: colors.toastText }]}>{actionLabel}</Text>
+          </Pressable>
+        ) : null}
+      </View>
+    </View>
   );
 }
 
@@ -52,10 +150,7 @@ export function GeneratingView({ copy }: GenProps) {
   const pulse = useSharedValue(0.92);
   useEffect(() => {
     pulse.value = withRepeat(
-      withSequence(
-        withSpring(1, motion.soft),
-        withSpring(0.92, motion.soft),
-      ),
+      withSequence(withSpring(1, motion.soft), withSpring(0.92, motion.soft)),
       -1,
       false,
     );
@@ -77,9 +172,10 @@ interface ErrProps {
 }
 
 export function ErrorBanner({ message, onRetry, onEdit }: ErrProps) {
+  const { colors } = useTheme();
   return (
-    <View style={styles.err}>
-      <Text style={styles.errText}>{message}</Text>
+    <View style={[styles.err, { backgroundColor: colors.dangerSoft }]}>
+      <Text style={[styles.errText, { color: colors.ink }]}>{message}</Text>
       <View style={styles.errActions}>
         <SoftButton label="Retry" onPress={onRetry} style={{ flex: 1 }} />
         <SoftButton label="Edit" variant="secondary" onPress={onEdit} style={{ flex: 1 }} />
@@ -88,49 +184,99 @@ export function ErrorBanner({ message, onRetry, onEdit }: ErrProps) {
   );
 }
 
+interface SemanticProps {
+  onEdit: () => void;
+  onKeep: () => void;
+}
+
+/** Only mount when server explicitly signals semantic uncertainty. */
+export function SemanticWarningBanner({ onEdit, onKeep }: SemanticProps) {
+  const { colors } = useTheme();
+  return (
+    <View style={[styles.semantic, { backgroundColor: colors.accentSoft }]}>
+      <Text style={[styles.errText, { color: colors.ink }]}>
+        We weren't totally sure what this was...
+      </Text>
+      <View style={styles.errActions}>
+        <SoftButton label="Edit doodle" variant="secondary" onPress={onEdit} style={{ flex: 1 }} />
+        <SoftButton label="Keep it weird" onPress={onKeep} style={{ flex: 1 }} />
+      </View>
+    </View>
+  );
+}
+
 const styles = StyleSheet.create({
   backdrop: {
     flex: 1,
-    backgroundColor: colors.overlay,
-    justifyContent: 'center',
-    padding: spacing.xl,
+    justifyContent: 'flex-end',
+    padding: spacing.md,
   },
-  card: {
-    backgroundColor: colors.surfaceElevated,
+  sheet: {
     borderRadius: radius.xl,
     padding: spacing.xl,
     gap: spacing.md,
+    marginBottom: spacing.md,
   },
   title: {
     ...type.title,
-    color: colors.brand,
+    fontSize: 20,
   },
   body: {
     ...type.body,
-    color: colors.muted,
+    fontSize: 15,
   },
   actions: {
     gap: spacing.sm,
     marginTop: spacing.sm,
   },
+  stayHit: {
+    minHeight: 44,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  stay: {
+    ...type.button,
+    fontSize: 15,
+  },
+  toastWrap: {
+    position: 'absolute',
+    left: spacing.md,
+    right: spacing.md,
+    bottom: 12,
+    alignItems: 'center',
+    zIndex: 20,
+  },
+  toast: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.md,
+    paddingHorizontal: spacing.lg,
+    paddingVertical: spacing.md,
+    borderRadius: radius.pill,
+  },
+  toastText: {
+    ...type.body,
+    fontSize: 14,
+    fontFamily: 'Figtree_500Medium',
+  },
+  toastAction: {
+    ...type.button,
+    fontSize: 14,
+    textDecorationLine: 'underline',
+  },
   genWrap: {
     flex: 1,
     alignItems: 'center',
     justifyContent: 'center',
-    backgroundColor: colors.surface,
     gap: spacing.xl,
   },
   orb: {
     width: 88,
     height: 88,
     borderRadius: 44,
-    backgroundColor: colors.accentSoft,
-    borderWidth: 3,
-    borderColor: colors.accent,
   },
   genCopy: {
     ...type.title,
-    color: colors.ink,
     textAlign: 'center',
     paddingHorizontal: spacing.xl,
   },
@@ -138,12 +284,16 @@ const styles = StyleSheet.create({
     margin: spacing.md,
     padding: spacing.lg,
     borderRadius: radius.lg,
-    backgroundColor: colors.dangerSoft,
+    gap: spacing.md,
+  },
+  semantic: {
+    margin: spacing.md,
+    padding: spacing.lg,
+    borderRadius: radius.lg,
     gap: spacing.md,
   },
   errText: {
     ...type.body,
-    color: colors.ink,
     textAlign: 'center',
   },
   errActions: {
