@@ -12,7 +12,15 @@
       "expo-router",
       "expo-font",
       "expo-asset",
-      "expo-sharing"
+      "expo-sharing",
+      [
+        "expo-splash-screen",
+        {
+          "image": "./assets/splash-icon.png",
+          "backgroundColor": "#FFF8F4",
+          "imageWidth": 200
+        }
+      ]
     ],
     "ios": {
       "supportsTablet": true,
@@ -44,7 +52,11 @@
     "extra": {
       "router": {
         "root": "src/app"
+      },
+      "eas": {
+        "projectId": "ce511ffe-a642-4861-8267-1a3173b952ba"
       }
-    }
+    },
+    "owner": "preety25"
   }
 }
